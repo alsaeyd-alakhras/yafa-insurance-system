@@ -35,60 +35,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
-        // $baseUrl = request()->getSchemeAndHttpHost();
-        // config([
-        //     'app.url' => $baseUrl,
-        //     'app.asset_url' => $baseUrl . '/public/'
-        // ]);
         Paginator::useBootstrapFive();
 
-
-        //Authouration
         Gate::before(function ($user, $ability) {
-            if($user instanceof User) {
-                if($user->super_admin) {
-                    return true;
-                }
-                if($user->user_type == 'employee') {
-                    // if(in_array($ability,[])){
-                    //     return true;
-                    // }
-                }
-            }
-        });
-        // the Authorization for Report Page
-        Gate::define('admins.super', function ($user) {
-            if($user instanceof User) {
-                if($user->roles->contains('role_name', 'admins.super')) {
-                    return true;
-                }
-                return false;
-            }
-        });
-        Gate::define('reports.view', function ($user) {
-            if($user instanceof User) {
-                if($user->roles->contains('role_name', 'reports.view')) {
-                    return true;
-                }
-                return false;
-            }
-        });
-        // checklist_admin has no dedicated Eloquent model (it manages checklist_groups +
-        // checklist_items together), so it can't rely on ModelPolicy's class-name-derived
-        // ability string - defined explicitly here instead, same pattern as reports.view.
-        Gate::define('checklist_admin.manage', function ($user) {
-            if($user instanceof User) {
-                if($user->roles->contains('role_name', 'checklist_admin.manage')) {
-                    return true;
-                }
-                return false;
+            if ($user instanceof User && $user->super_admin) {
+                return true;
             }
         });
 
-
-
-        // Observe For Models
         User::observe(UserObserver::class);
         Constant::observe(ConstantObserver::class);
     }

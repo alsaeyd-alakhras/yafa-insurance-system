@@ -18,7 +18,7 @@
 | Phase | المحتوى | الحالة |
 |---|---|---|
 | Phase 1 | تنظيف المشروع القديم + إصلاح عطل middleware | `[x]` |
-| Phase 2 | المصادقة والصلاحيات (role + RoleUser + Policies) | `[ ]` |
+| Phase 2 | المصادقة والصلاحيات (role + RoleUser + Policies) | `[x]` |
 | Phase 3 | Migrations للكيانات الجديدة | `[ ]` |
 | Phase 4 | Layout والـ Navigation | `[ ]` |
 | Phase 5 | بناء الكيانات (Organization Unit → Medical Department → Employee/Dependent → User → Visit) | `[ ]` |
@@ -67,26 +67,28 @@
 
 مرجع: [`phase-2-auth-authorization.md`](phase-2-auth-authorization.md)
 
-- [ ] **2.1** Migration + تنظيف موديل `User`
-  - [ ] 2.1.1 migration إضافة عمود `role` enum(admin,receptionist) default receptionist
-  - [ ] 2.1.2 تنظيف `$fillable`/`casts()` من `phone`/`user_type`/`is_active`، حذف علاقة `person()`
-  - [ ] 2.1.3 إضافة `isAdmin()`/`isReceptionist()` helpers
-- [ ] **2.2** آلية الصلاحيات (`RoleUser` هو الفحص الفعلي)
-  - [ ] 2.2.1 تعديل `Gate::before` بـ `AppServiceProvider` — إبقاء `super_admin` فقط، حذف أي bypass عام لـ `role=admin`
-  - [ ] 2.2.2 حذف الـ 3 استدعاءات `Gate::define()` الميتة (admins.super, reports.view, checklist_admin.manage)
-  - [ ] 2.2.3 تحديث `data/abilities.php` — إضافة مجموعات الكيانات الست الجديدة (organization_units, medical_departments, employees, dependents, visits [+ delete-own], survey_submissions)
-  - [ ] 2.2.4 التحقق من تطابق مفتاح `activitylogs` بالملف مع الـ ability string الفعلي المُشتق (`Str::kebab(Str::plural('ActivityLog'))`) وتصحيحه إذا لزم
-- [ ] **2.3** إنشاء الـ Policies الجديدة (فارغة، `extends ModelPolicy`)
-  - [ ] 2.3.1 `OrganizationUnitPolicy`
-  - [ ] 2.3.2 `MedicalDepartmentPolicy`
-  - [ ] 2.3.3 `SurveySubmissionPolicy`
-  - [ ] 2.3.4 `EmployeePolicy`
-  - [ ] 2.3.5 `DependentPolicy`
-- [ ] **2.4** `VisitPolicy` المخصصة (منطق ملكية `delete`/`delete-own`)
-- [ ] **2.5** قيود حذف المستخدمين بـ `UserController::destroy()` (منع حذف الذات، منع أدمن عادي من حذف أدمن آخر، `super_admin` يتجاوز الكل)
-- [ ] **2.6** فحص `LogLastUserActivity` (مكرر مع 1.1.4، تأكيد نهائي فقط)
+- [x] **2.1** Migration + تنظيف موديل `User`
+  - [x] 2.1.1 migration إضافة عمود `role` enum(admin,receptionist) default receptionist
+  - [x] 2.1.2 تنظيف `$fillable`/`casts()` من `phone`/`user_type`/`is_active`، حذف علاقة `person()`
+  - [x] 2.1.3 إضافة `isAdmin()`/`isReceptionist()` helpers
+- [x] **2.2** آلية الصلاحيات (`RoleUser` هو الفحص الفعلي)
+  - [x] 2.2.1 تعديل `Gate::before` بـ `AppServiceProvider` — إبقاء `super_admin` فقط، حذف أي bypass عام لـ `role=admin`
+  - [x] 2.2.2 حذف الـ 3 استدعاءات `Gate::define()` الميتة (admins.super, reports.view, checklist_admin.manage)
+  - [x] 2.2.3 تحديث `data/abilities.php` — إضافة مجموعات الكيانات الست الجديدة (organization_units, medical_departments, employees, dependents, visits [+ delete-own], survey_submissions)
+  - [x] 2.2.4 التحقق من تطابق مفتاح `activitylogs` بالملف مع الـ ability string الفعلي المُشتق — تأكَّد: `activitylogs` صحيح فعلاً (لا حاجة لتصحيح، `Str::plural(Str::lower('ActivityLog'))` تنتج `activitylogs` بالضبط)
+- [x] **2.3** إنشاء الـ Policies الجديدة (فارغة، `extends ModelPolicy`)
+  - [x] 2.3.1 `OrganizationUnitPolicy`
+  - [x] 2.3.2 `MedicalDepartmentPolicy`
+  - [x] 2.3.3 `SurveySubmissionPolicy`
+  - [x] 2.3.4 `EmployeePolicy`
+  - [x] 2.3.5 `DependentPolicy`
+- [x] **2.4** `VisitPolicy` المخصصة (منطق ملكية `delete`/`delete-own`)
+- [x] **2.5** قيود حذف المستخدمين بـ `UserController::destroy()` (منع حذف الذات، منع أدمن عادي من حذف أدمن آخر، `super_admin` يتجاوز الكل)
+- [x] **2.6** فحص `LogLastUserActivity` (مكرر مع 1.1.4، تأكيد نهائي فقط) — تأكَّد: نظيف، بدون تعديل
 
 **TESTING (شرط إغلاق المرحلة):** إنشاء مستخدم admin ومستخدم receptionist يدوياً (seeder أو tinker)، تسجيل دخول بكل واحد، التأكد من ظهور/اختفاء صحيح لعناصر الصلاحيات (حتى لو النav لسا ما اتحدّث بـ Phase 4 — الفحص عبر `Gate::allows()` بـ tinker كافي بهذه المرحلة).
+
+**ملاحظة تنفيذ:** التنفيذ تم عبر Codex (مفوَّض ومراجَع بالكامل من Claude) — كل خطوة من 2.1 إلى 2.6 طابقت `phase-2-auth-authorization.md` حرفياً. تم تأكيدها عبر: `php -l` على كل ملف مُنشأ/مُعدَّل، فحص شامل بالـ grep للتأكد من حذف كل مرجعية لـ `admins.super`/`reports.view`/`checklist_admin.manage` وللحقول الوهمية (`user_type`/`is_active`) من `User.php` (صفر نتائج بكل الحالتين)، ومطابقة `VisitPolicy` والمحتوى النهائي لـ `AppServiceProvider::boot()` حرفياً مع النص المحسوم بالخطة. **تصحيح أثناء المراجعة:** كتابة Codex المباشرة عبر shell (بدل `apply_patch` الذي فشل ببيئة Windows sandbox) أنتجت نص عربي تالف (encoding خاطئ، رموز `�`) بملفين: `data/abilities.php` (كل التسميات العربية للمجموعات الست الجديدة) و `UserController.php` (رسالتي الخطأ بـ `destroy()`) — تم اكتشافه وتصحيحه يدوياً بمراجعة Claude قبل الـ commit (لم يظهر بفحص `php -l` لأنه تلف بمحتوى string صالح تركيبياً). **الاختبار الحي (`Gate::allows()` عبر tinker) لم يُنفَّذ بهذا الـ commit** لنفس سبب Phase 1 (`composer install` غير مكتمل محلياً) — نفس قرار المستخدم بالمتابعة اعتماداً على المراجعة الساكنة.
 
 ---
 

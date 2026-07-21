@@ -330,6 +330,8 @@ class UserController extends Controller
     public function destroy(Request $request, User $user)
     {
         $this->authorize('delete', User::class);
+        abort_if($user->id === auth()->id(), 403, 'لا يمكنك حذف حسابك الخاص.');
+        abort_if($user->role === 'admin' && !auth()->user()->super_admin, 403, 'فقط المدير العام (super admin) يقدر يحذف حساب أدمن آخر.');
         if ($user->avatar != null) {
             Storage::disk('public')->delete($user->avatar);
         }

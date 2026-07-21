@@ -25,4 +25,43 @@ return [
         'name' => 'العمليات',
         'view' => 'عرض',
     ],
+    'organization_units' => [
+        'name' => 'الوحدات التنظيمية',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+        'delete' => 'حذف',
+    ],
+    'medical_departments' => [
+        'name' => 'الأقسام الطبية',
+        'view' => 'عرض',
+        'update' => 'تعديل',
+    ],
+    'employees' => [
+        'name' => 'الموظفون',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+        'delete' => 'حذف',
+    ],
+    'dependents' => [
+        'name' => 'التابعون',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+        'delete' => 'حذف',
+    ],
+    'visits' => [
+        'name' => 'الزيارات',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+        'delete' => 'حذف',
+        'delete-own' => 'حذف الزيارات الخاصة',
+    ],
+    'survey_submissions' => [
+        'name' => 'طلبات الاستبيان',
+        'view' => 'عرض',
+        'update' => 'تعديل',
+    ],
 ];
