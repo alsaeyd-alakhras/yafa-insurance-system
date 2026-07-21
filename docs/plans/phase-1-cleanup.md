@@ -27,7 +27,7 @@ $middleware->alias([
 بالترتيب (مع حذف سطر `use` المقابل من الأعلى):
 - `reports.*` (index, export, tradersReve, brokersReve, broker-details) + `use ReportController`
 - `profile/complete-phone` (GET/PUT) — يعتمد على `Person` model غير موجود بهذا المشروع
-- `aid-distributions-filters` + `use AidDistributionController`
+- `aid-distributions-filters` + `use AidDistributionController` — **[محسوم]** يُحذف هذا الـ route تحديداً رغم قرار الإبقاء على ملفات `aid_distributions` (انظر خطوة 1.5) لأن `AidDistributionController` **غير موجود أصلاً كملف بالكود** (تم التأكد: لا يوجد `app/Http/Controllers/Dashboard/AidDistributionController.php`) — الـ route معطّل حتماً (`Target class does not exist`) بغض النظر عن قرار الإبقاء على الـ views كمرجع دراسة. الإبقاء على المرجع يقتصر على ملفات Blade + `datatable.js` فقط، وليس route/controller فعلي يعمل.
 - `currencies` resource + `use CurrencyController`
 - الكتلة كاملة من `// Foundation — organizational hierarchy...` حتى `// Checklist admin` ضمناً:
   - `org-structure.*`, `directory.*`, `departments.by-center`, `sections.by-department`, `sections.for-project`
@@ -68,7 +68,9 @@ $middleware->alias([
 
 **لا تُحذف بعد:** `resources/views/dashboard/aid_distributions/{index,create,edit,_form}.blade.php`
 
-  هاي الملفات هي المرجع الحي الوحيد لنمط الـ DataTable (`datatable.js` + الفلاتر + التصدير) ونمط "صفحة منفصلة للفورم المعقد المتداخل". تُبقى للرجوع إليها أثناء بناء الكيانات بالمرحلة 5، وتُحذف فقط كآخر خطوة بتلك المرحلة بعد ما توجد صفحة `employees` أو `visits` كمرجع بديل فعلي.
+  هاي الملفات هي المرجع الحي الوحيد لنمط الـ DataTable (`datatable.js` + الفلاتر + التصدير) ونمط "صفحة منفصلة للفورم المعقد المتداخل". **[محسوم]** تأكيد المستخدم: هاي الطريقة (الفلاتر + نمط DataTable) مهمة ولازم تُفهَم كويس قبل أي حذف — تبقى **حتى نهاية المرحلة 5 بالكامل** (وليس أول ما توجد صفحة بديلة)، وتُحذف فقط كآخر خطوة صريحة بتلك المرحلة بعد التأكد الكامل من أن كل كيان جديد نسخ النمط المطلوب منها فعلياً.
+
+  **لا تُحذف أيضاً:** `resources/views/layouts/front-layout.blade.php`، `resources/views/layouts/partials/aside.blade.php`، `resources/views/layouts/partials/nav.blade.php` — **[محسوم، تراجع عن القرار الأصلي بالحذف]** رغم إنها فعلاً غير مُستخدَمة حالياً (`FrontLayout::render()` يوجّه دايماً لـ `front-layout-horizantal.blade.php` بغض النظر عن قيمة `dirNav`)، هذول جزء من آلية تبديل اتجاه القائمة (أفقي/عمودي) الموجودة فعلياً عبر كوكي `dirNav` وفرع معلَّق (commented-out) بـ `FrontLayout::render()` — المستخدم يريد الإبقاء على إمكانية التحويل لاحقاً للوضع الجانبي (Vertical Aside)، فالحذف الآن يفقد هذا الخيار بلا داعٍ. **بدل الحذف:** تُنظَّف الروابط الميتة جواتها فقط (نفس منطق `asideH.blade.php`/`navH.blade.php` بالضبط — تُزال أي روابط لـ routes/models قديمة: `org-structure`, `directory`, `centers`, `departments`, `sections`, `people`, `funders`, `monitoring-activities`, `projects`, `checklist-admin`, وأي مرجعية لـ `Allocation`/`Executive`/`Broker`/`AccreditationProject`)، وتُبقى بنية الملف ونقاط الدخول (title, wrapper markup) كما هي دون حذف الملفات نفسها. **ملاحظة تنفيذية:** هذا التنظيف يعتمد على تحديد الروابط النهائية الصحيحة بالمرحلة 4 (نفس محتوى `asideH.blade.php`/`navH.blade.php` المُحدَّثين) — لذلك يُنفَّذ فعلياً بالتوازي مع أو بعد المرحلة 4 مباشرة، وليس بمعزل تام ضمن المرحلة 1؛ يكفي بهذه المرحلة (1) تأكيد عدم الحذف و(2) إزالة أي رابط يشير لـ Controller/Model محذوف فعلاً بهذه المرحلة (fail-fast لتفادي أي احتمال استخدامها بالخطأ قبل التحديث الكامل بالمرحلة 4).
 
 **تدقيق إضافي:** راجع باقي ملفات `resources/views/dashboard/pages/*` (تم تأكيد: `logs.blade.php` و `constants.blade.php` + مجلد `constants/` الفرعي هم عامّون ويُبقوا؛ فقط `report.blade.php` و `currencies.blade.php` من المجال القديم).
 
@@ -76,8 +78,8 @@ $middleware->alias([
 
 - حذف مجموعات المجال القديم: `centers`, `departments`, `sections`, `people`, `funders`, `monitoringactivities`, `projects`, أي مفتاح متعلق بـ `checklist_admin`.
 - الإبقاء على: `users`, `constants`, `activitylogs`.
-- **[مُعدَّل بعد قرار المرحلة 2]** هذا الملف **يبقى مستخدَم فعلياً وليس شبه ميت** — بعد تراجع قرار الصلاحيات لصالح الاعتماد الكامل على `RoleUser` (انظر `phase-2-auth-authorization.md` §2.3)، هذا الملف يُستخدم لعرض قائمة الصلاحيات الجزئية بواجهة إنشاء/تعديل المستخدم. يُضاف له مجموعات الكيانات الجديدة الستة كخطوة بالمرحلة 2 (وليس هذه المرحلة — الحذف هنا يقتصر على إزالة مجموعات المجال القديم فقط).
-- **ملاحظة للتحقق:** مفتاح `activitylogs` قد لا يطابق الـ ability string اللي يشتقه `ModelPolicy::__call` فعلياً لموديل `ActivityLog` (على الأغلب `activity-logs` عبر `Str::kebab(Str::plural(...))`، مش `activitylogs` المُلصَق). يُتحقق منه ويُصحَّح بالمرحلة 2 — هذه المرة **يؤثر فعلياً** على الصلاحيات (لا يوجد bypass عام للأدمن بعد الآن، فقط `super_admin`)، فالتصحيح مهم وليس تجميلياً فقط.
+- **[محسوم — تصحيح فهم]** آلية `data/abilities.php` + `ModelPolicy::__call` **كانت صحيحة ومتّسقة من البداية** كنمط فحص صلاحيات — الالتباس بالصياغة السابقة (اللي وصفتها كـ"شبه ميتة" أو فيها "مشاكل") كان قصور بالشرح مني وليس عيب فعلي بالتصميم الأصلي. هذا الملف **مستخدَم فعلياً** لعرض قائمة الصلاحيات الجزئية بواجهة إنشاء/تعديل المستخدم، ويبقى هو مصدر الحقيقة لأسماء المجموعات/القدرات المعروضة بواجهة إدارة صلاحيات `RoleUser`. يُضاف له مجموعات الكيانات الجديدة الستة كخطوة بالمرحلة 2 (وليس هذه المرحلة — الحذف هنا يقتصر على إزالة مجموعات المجال القديم فقط)، مع تعديلات بسيطة فقط على بعض المفاتيح (انظر الملاحظة التالية) — لا إعادة تصميم للآلية نفسها.
+- **ملاحظة للتحقق (تعديل بسيط، وليس مشكلة بنيوية):** مفتاح `activitylogs` قد لا يطابق حرفياً الـ ability string اللي يشتقه `ModelPolicy::__call` فعلياً لموديل `ActivityLog` (على الأغلب `activity-logs` عبر `Str::kebab(Str::plural(...))`، مش `activitylogs` المُلصَق). يُتحقق منه ويُصحَّح بالمرحلة 2 كتعديل تسمية بسيط فقط — هذه المرة **يؤثر فعلياً** على الصلاحيات (لا يوجد bypass عام للأدمن بعد الآن، فقط `super_admin`)، فالتصحيح مهم وليس تجميلياً فقط، لكنه لا يغيّر آلية الفحص نفسها.
 
 ## ترتيب التنفيذ المقترح
 
