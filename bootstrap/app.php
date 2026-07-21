@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\CheckUserCookie;
 use App\Http\Middleware\LogLastUserActivity;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,10 +14,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web([
             LogLastUserActivity::class,
-        ]);
-        $middleware->alias([
-            'check.cookie' => CheckUserCookie::class,
-            'ensure.phone' => \App\Http\Middleware\EnsurePhoneIsSet::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

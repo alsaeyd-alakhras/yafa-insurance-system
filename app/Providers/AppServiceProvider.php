@@ -3,11 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Constant;
-use App\Models\Currency;
 use App\Models\User;
 use App\Services\RoleAbilitiesService;
 use App\Observers\ConstantObserver;
-use App\Observers\CurrencyObserver;
 use App\Observers\UserObserver;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
@@ -78,7 +76,7 @@ class AppServiceProvider extends ServiceProvider
         });
         // checklist_admin has no dedicated Eloquent model (it manages checklist_groups +
         // checklist_items together), so it can't rely on ModelPolicy's class-name-derived
-        // ability string — defined explicitly here instead, same pattern as reports.view.
+        // ability string - defined explicitly here instead, same pattern as reports.view.
         Gate::define('checklist_admin.manage', function ($user) {
             if($user instanceof User) {
                 if($user->roles->contains('role_name', 'checklist_admin.manage')) {
@@ -93,6 +91,5 @@ class AppServiceProvider extends ServiceProvider
         // Observe For Models
         User::observe(UserObserver::class);
         Constant::observe(ConstantObserver::class);
-        Currency::observe(CurrencyObserver::class);
     }
 }
