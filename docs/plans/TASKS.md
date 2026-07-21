@@ -19,7 +19,7 @@
 |---|---|---|
 | Phase 1 | تنظيف المشروع القديم + إصلاح عطل middleware | `[x]` |
 | Phase 2 | المصادقة والصلاحيات (role + RoleUser + Policies) | `[x]` |
-| Phase 3 | Migrations للكيانات الجديدة | `[ ]` |
+| Phase 3 | Migrations للكيانات الجديدة | `[x]` |
 | Phase 4 | Layout والـ Navigation | `[ ]` |
 | Phase 5 | بناء الكيانات (Organization Unit → Medical Department → Employee/Dependent → User → Visit) | `[ ]` |
 | Phase 6 | تدفقات العمل الخاصة (استبيان + تسجيل زيارة + رصيد شهري) | `[ ]` |
@@ -96,16 +96,18 @@
 
 مرجع: [`phase-3-migrations.md`](phase-3-migrations.md)
 
-- [ ] **3.1** `create_organization_units_table` + موديل `OrganizationUnit`
-- [ ] **3.2** `create_medical_departments_table` + موديل `MedicalDepartment` + seeder (4 صفوف ثابتة)
-- [ ] **3.3** `create_employees_table` + موديل `Employee`
-- [ ] **3.4** `create_dependents_table` + موديل `Dependent`
-- [ ] **3.5** `create_visits_table` (مع unique constraints المزدوجة) + موديل `Visit`
-- [ ] **3.6** `create_visit_departments_table` + موديل `VisitDepartment`
-- [ ] **3.7** `create_survey_submissions_table` + موديل `SurveySubmission`
-- [ ] **3.8** `app/Rules/UniqueNationalId.php` (custom validation rule عبر employees+dependents معاً)
+- [x] **3.1** `create_organization_units_table` + موديل `OrganizationUnit`
+- [x] **3.2** `create_medical_departments_table` + موديل `MedicalDepartment` + seeder (4 صفوف ثابتة) — قيمة `discount_percentage` مؤقتة `0.00` لكل الأقسام الأربعة (قرار تشغيلي فعلي يُترك للأدمن لاحقاً، ليس جزء من هذه المرحلة)
+- [x] **3.3** `create_employees_table` + موديل `Employee`
+- [x] **3.4** `create_dependents_table` + موديل `Dependent`
+- [x] **3.5** `create_visits_table` (مع unique constraints المزدوجة) + موديل `Visit`
+- [x] **3.6** `create_visit_departments_table` + موديل `VisitDepartment`
+- [x] **3.7** `create_survey_submissions_table` + موديل `SurveySubmission`
+- [x] **3.8** `app/Rules/UniqueNationalId.php` (custom validation rule عبر employees+dependents معاً) — غير مربوطة بأي Controller بعد (لا Controllers لهذه الكيانات حتى الآن)، جاهزة للاستخدام بالمرحلة 5
 
 **TESTING (شرط إغلاق المرحلة):** `php artisan migrate:fresh --seed` ينجح بدون أخطاء، فحص العلاقات الأساسية عبر tinker (مثال: `Employee::first()->dependents`, `MedicalDepartment::count() === 4`).
+
+**ملاحظة تنفيذ:** التنفيذ تم عبر Codex (مفوَّض ومراجَع بالكامل من Claude) — كل الـ 7 migrations + 7 موديلات + seeder + validation rule طابقت `phase-3-migrations.md` حرفياً (كل الأعمدة، الـ FK constraints، سلوك `restrictOnDelete`/`cascadeOnDelete`/`nullOnDelete`، الـ unique constraints المزدوجة على `visits`، وغياب `created_at`/`updated_at` القياسيين بـ `medical_departments`/`visit_departments`). تم التأكد من: `php -l` على كل ملف (17 ملف)، فحص شامل بالـ grep لعدم وجود أي تلف encoding بالنص العربي (نفس مشكلة Phase 2 — لم تتكرر هذه المرة، كل الملفات نظيفة عند المراجعة)، ترتيب الـ migrations الزمني يطابق ترتيب الاعتمادية بالضبط، ووجود كل الموديلات السبعة بالأسماء الصحيحة. `DatabaseSeeder.php` عُدِّل بسطر واحد فقط (`$this->call(MedicalDepartmentSeeder::class)`) — المشاكل الموجودة مسبقاً فيه (كلمة مرور نص صريح، `use App\Models\User` مفقود) لم تُمس، خارج نطاق هذه المرحلة. **الاختبار الحي (`migrate:fresh --seed` + tinker) لم يُنفَّذ بهذا الـ commit** لنفس سبب Phase 1/2 (`composer install` غير مكتمل محلياً).
 
 ---
 

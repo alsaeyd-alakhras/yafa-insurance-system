@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(MedicalDepartmentSeeder::class);
+
         User::create([
             'name' => 'Alsaeyd J Alakhras',
             'email' => 'alsaeydjalkhras@gmail.com',
