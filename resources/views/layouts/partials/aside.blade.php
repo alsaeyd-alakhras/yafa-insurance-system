@@ -21,148 +21,92 @@
         <li class="menu-item {{ request()->is('/') ? 'active' : '' }}">
             <a href="{{ route('dashboard.home') }}" class="menu-link">
                 <i class="fa-solid fa-house me-2"></i>
-                <div data-i18n="home">الرئيسية</div>
+                <div data-i18n="home">الرئيسية</div>
             </a>
         </li>
-        @can('view','App\\Models\AccreditationProject')
-        <li class="menu-item {{ request()->is('accreditations/*') || request()->is('accreditations') ? 'active' : '' }}">
-            <a href="{{ route('dashboard.accreditations.index') }}" class="menu-link">
-                <i class="fa-solid fa-check-circle me-2"></i>
-                <div data-i18n="accreditations">الإعتمادية</div>
+        @can('view', 'App\Models\Visit')
+        <li class="menu-item {{ request()->is('visits*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.visits.index') }}" class="menu-link">
+                <i class="fa-solid fa-notes-medical me-2"></i>
+                <div data-i18n="visits">الزيارات</div>
             </a>
         </li>
         @endcan
-        @can('reports.view')
-        <li class="menu-item {{ request()->is('reports/*') || request()->is('reports') ? 'active' : '' }}">
-            <a href="{{ route('dashboard.reports.index') }}" class="menu-link">
-                <i class="fa-solid fa-file-alt me-2"></i>
-                <div data-i18n="reports">التقارير</div>
+        @can('view', 'App\Models\Employee')
+        <li class="menu-item {{ request()->is('employees*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.employees.index') }}" class="menu-link">
+                <i class="fa-solid fa-users me-2"></i>
+                <div data-i18n="employees">الموظفون والتابعون</div>
             </a>
         </li>
         @endcan
         <li class="menu-header small">
             <span class="menu-header-text" data-i18n="Apps &amp; Pages">البيانات الأساسية</span>
         </li>
-        @can('view','App\\Models\Allocation')
-        <li class="menu-item {{ request()->is('allocations/*') || request()->is('allocations') ? 'active' : '' }}">
-            <a href="{{ route('dashboard.allocations.index') }}" class="menu-link">
-                <i class="fa-solid fa-clipboard-list me-2"></i>
-                <div data-i18n="allocations">التخصيصات</div>
+        @can('view', 'App\Models\OrganizationUnit')
+        <li class="menu-item {{ request()->is('organization-units*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.organization-units.index') }}" class="menu-link">
+                <i class="fa-solid fa-sitemap me-2"></i>
+                <div data-i18n="organization_units">الوحدات التنظيمية</div>
             </a>
         </li>
         @endcan
-        @can('view','App\\Models\Executive')
-        <li class="menu-item {{ request()->is('executives/*') || request()->is('executives') ? 'active' : '' }}">
-            <a href="{{ route('dashboard.executives.index') }}" class="menu-link">
-                <i class="fa-solid fa-users-cog me-2"></i>
-                <div data-i18n="executives">التنفيذات</div>
+        @can('view', 'App\Models\MedicalDepartment')
+        <li class="menu-item {{ request()->is('medical-departments*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.medical-departments.index') }}" class="menu-link">
+                <i class="fa-solid fa-hospital me-2"></i>
+                <div data-i18n="medical_departments">الأقسام الطبية</div>
+            </a>
+        </li>
+        @endcan
+        @can('view', 'App\Models\SurveySubmission')
+        <li class="menu-item {{ request()->is('survey-submissions*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.survey-submissions.index') }}" class="menu-link">
+                <i class="fa-solid fa-file-circle-question me-2"></i>
+                <div data-i18n="survey_submissions">طلبات الاستبيان</div>
             </a>
         </li>
         @endcan
         <li class="menu-header small">
             <span class="menu-header-text" data-i18n="Apps &amp; Pages">إدارة النظام</span>
         </li>
-        <li class="menu-item" style="">
-            <a href="javascript:void(0)" class="menu-link menu-toggle">
-                <i class="fa-solid fa-database me-2"></i>
-                <div data-i18n="our-data">البيانات الأخرى</div>
+        @can('view', 'App\Models\User')
+        <li class="menu-item {{ request()->is('users*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.users.index') }}" class="menu-link">
+                <i class="fa-solid fa-user-gear me-2"></i>
+                <div data-i18n="users">إدارة المستخدمين</div>
             </a>
-            <ul class="menu-sub">
-                @can('view','App\\Models\Broker')
-                <li class="menu-item {{ request()->is('brokers/*') || request()->is('brokers') ? 'active' : '' }}">
-                    <a href="{{ route('dashboard.brokers.index') }}" class="menu-link">
-                        <i class="fa-solid fa-building me-2"></i>
-                        <div data-i18n="brokers">المؤسسات</div>
-                    </a>
-                </li>
-                @endcan
-                @can('view','App\\Models\Item')
-                <li class="menu-item {{ request()->is('items/*') || request()->is('items') ? 'active' : '' }}">
-                    <a href="{{ route('dashboard.items.index') }}" class="menu-link">
-                        <i class="fa-solid fa-boxes me-2"></i>
-                        <div data-i18n="items">الأصناف</div>
-                    </a>
-                </li>
-                @endcan
-            </ul>
         </li>
-        <li class="menu-item">
+        @endcan
+        @if (
+            auth()->user()?->can('view', 'App\Models\Constant')
+            || auth()->user()?->can('view', 'App\Models\ActivityLog')
+        )
+        <li class="menu-item {{ request()->is('constants*') || request()->is('logs*') ? 'active open' : '' }}">
             <a href="javascript:void(0)" class="menu-link menu-toggle">
                 <i class="fa-solid fa-gear me-2"></i>
                 <div data-i18n="settings">الإعدادات</div>
             </a>
             <ul class="menu-sub">
-                @can('view','App\\Models\User')
-                <li class="menu-item {{ request()->is('users/*') || request()->is('users') ? 'active' : '' }}">
-                    <a href="{{ route('dashboard.users.index') }}" class="menu-link">
-                        <i class="fa-solid fa-users me-2"></i>
-                        <div data-i18n="users">المستخدمين</div>
+                @can('view', 'App\Models\Constant')
+                <li class="menu-item {{ request()->is('constants*') ? 'active' : '' }}">
+                    <a href="{{ route('dashboard.constants.index') }}" class="menu-link">
+                        <i class="fa-solid fa-sliders me-2"></i>
+                        <div data-i18n="constants">ثوابت النظام</div>
                     </a>
                 </li>
                 @endcan
-                @can('view','App\\Models\ActivityLog')
-                <li class="menu-item {{ request()->is('logs/*') || request()->is('logs') ? 'active' : '' }}">
+                @can('view', 'App\Models\ActivityLog')
+                <li class="menu-item {{ request()->is('logs*') ? 'active' : '' }}">
                     <a href="{{ route('dashboard.logs.index') }}" class="menu-link">
                         <i class="fa-solid fa-calendar-days me-2"></i>
                         <div data-i18n="logs">الأحداث</div>
                     </a>
                 </li>
                 @endcan
-                @can('view','App\\Models\Currency')
-                <li class="menu-item {{ request()->is('currencies/*') || request()->is('currencies') ? 'active' : '' }}">
-                    <a href="{{ route('dashboard.currencies.index') }}" class="menu-link">
-                        <i class="fa-solid fa-coins me-2"></i>
-                        <div data-i18n="currencies">العملات</div>
-                    </a>
-                </li>
-                @endcan
             </ul>
         </li>
-        {{-- <li class="menu-item">
-            <a href="page-2.html" class="menu-link">
-                <i class="menu-icon tf-icons ti ti-app-window"></i>
-                <i class="fa-solid fa-house me-2"></i>
-                <div data-i18n="Page 2">Page 2</div>
-            </a>
-        </li>
-        <li class="menu-item">
-            <a href="javascript:void(0)" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons ti ti-smart-home"></i>
-                <div data-i18n="Dashboards">Dashboards</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item">
-                    <a href="index.html" class="menu-link">
-                        <i class="menu-icon tf-icons ti ti-chart-pie-2"></i>
-                        <div data-i18n="Analytics">Analytics</div>
-                    </a>
-                </li>
-                <li class="menu-item">
-                    <a href="dashboards-crm.html" class="menu-link">
-                        <i class="menu-icon tf-icons ti ti-3d-cube-sphere"></i>
-                        <div data-i18n="CRM">CRM</div>
-                    </a>
-                </li>
-                <li class="menu-item">
-                    <a href="app-ecommerce-dashboard.html" class="menu-link">
-                        <i class="menu-icon tf-icons ti ti-shopping-cart"></i>
-                        <div data-i18n="eCommerce">eCommerce</div>
-                    </a>
-                </li>
-                <li class="menu-item">
-                    <a href="app-logistics-dashboard.html" class="menu-link">
-                        <i class="menu-icon tf-icons ti ti-truck"></i>
-                        <div data-i18n="Logistics">Logistics</div>
-                    </a>
-                </li>
-                <li class="menu-item">
-                    <a href="app-academy-dashboard.html" class="menu-link">
-                        <i class="menu-icon tf-icons ti ti-book"></i>
-                        <div data-i18n="Academy">Academy</div>
-                    </a>
-                </li>
-            </ul>
-        </li> --}}
+        @endif
     </ul>
     <div class="my-3 text-center text-white text-body">
         ©
