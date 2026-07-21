@@ -12,7 +12,7 @@ class VisitPolicy
         return true;
     }
 
-    public function view(User $user, Visit $visit): bool
+    public function view(User $user, ?Visit $visit = null): bool
     {
         return true;
     }

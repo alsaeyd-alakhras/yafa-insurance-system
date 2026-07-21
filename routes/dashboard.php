@@ -39,4 +39,11 @@ Route::group([
     ]);
 
     /* ********************************************************** */
+
+    // Phase 5 placeholders — remove each line once its real controller/routes land
+    Route::get('visits', fn () => view('dashboard.pages.coming-soon', ['label' => 'الزيارات']))->name('visits.index');
+    Route::get('employees', fn () => view('dashboard.pages.coming-soon', ['label' => 'الموظفون والتابعون']))->name('employees.index');
+    Route::get('organization-units', fn () => view('dashboard.pages.coming-soon', ['label' => 'الوحدات التنظيمية']))->name('organization-units.index');
+    Route::get('medical-departments', fn () => view('dashboard.pages.coming-soon', ['label' => 'الأقسام الطبية']))->name('medical-departments.index');
+    Route::get('survey-submissions', fn () => view('dashboard.pages.coming-soon', ['label' => 'طلبات الاستبيان']))->name('survey-submissions.index');
 });
