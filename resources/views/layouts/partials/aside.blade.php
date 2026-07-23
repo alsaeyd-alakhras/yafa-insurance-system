@@ -59,6 +59,14 @@
             </a>
         </li>
         @endcan
+        @can('view', 'App\Models\Clinic')
+        <li class="menu-item {{ request()->is('clinics*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.clinics.index') }}" class="menu-link">
+                <i class="fa-solid fa-stethoscope me-2"></i>
+                <div data-i18n="clinics">العيادات</div>
+            </a>
+        </li>
+        @endcan
         @can('view', 'App\Models\SurveySubmission')
         <li class="menu-item {{ request()->is('survey-submissions*') ? 'active' : '' }}">
             <a href="{{ route('dashboard.survey-submissions.index') }}" class="menu-link">

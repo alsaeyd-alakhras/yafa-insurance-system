@@ -15,6 +15,7 @@ class Visit extends Model
         'employee_id',
         'patient_employee_id',
         'patient_dependent_id',
+        'clinic_id',
         'visit_date',
         'recorded_by',
         'last_updated_by',
@@ -37,6 +38,11 @@ class Visit extends Model
         return $this->belongsTo(Dependent::class, 'patient_dependent_id');
     }
 
+    public function clinic(): BelongsTo
+    {
+        return $this->belongsTo(Clinic::class);
+    }
+
     public function visitDepartments(): HasMany
     {
         return $this->hasMany(VisitDepartment::class);
@@ -50,5 +56,30 @@ class Visit extends Model
     public function lastUpdatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'last_updated_by');
+    }
+
+    public function patient(): Employee|Dependent|null
+    {
+        return $this->patient_employee_id ? $this->patientEmployee : $this->patientDependent;
+    }
+
+    public function recalculateTotals(): void
+    {
+        $totals = $this->visitDepartments()
+            ->whereNotNull('amount_before_discount')
+            ->get()
+            ->reduce(function (array $carry, VisitDepartment $department) {
+                $carry['before'] += (float) $department->amount_before_discount;
+                $carry['after'] += (float) $department->calculateAmountAfterDiscount();
+
+                return $carry;
+            }, ['before' => 0.0, 'after' => 0.0]);
+
+        $hasAmounts = $this->visitDepartments()->whereNotNull('amount_before_discount')->exists();
+
+        $this->update([
+            'total_before_discount' => $hasAmounts ? $totals['before'] : null,
+            'total_after_discount' => $hasAmounts ? $totals['after'] : null,
+        ]);
     }
 }

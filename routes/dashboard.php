@@ -4,9 +4,15 @@
 // dashboard routes
 
 use App\Http\Controllers\Dashboard\ActivityLogController;
+use App\Http\Controllers\Dashboard\ClinicController;
 use App\Http\Controllers\Dashboard\ConstantController;
+use App\Http\Controllers\Dashboard\DependentController;
+use App\Http\Controllers\Dashboard\EmployeeController;
 use App\Http\Controllers\Dashboard\HomeController;
+use App\Http\Controllers\Dashboard\MedicalDepartmentController;
+use App\Http\Controllers\Dashboard\OrganizationUnitController;
 use App\Http\Controllers\Dashboard\UserController;
+use App\Http\Controllers\Dashboard\VisitController;
 use Illuminate\Support\Facades\Route;
 
 Route::group([
@@ -38,12 +44,25 @@ Route::group([
         'users' => UserController::class,
     ]);
 
+    Route::resource('organization-units', OrganizationUnitController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('medical-departments', MedicalDepartmentController::class)->only(['index', 'update']);
+    Route::resource('clinics', ClinicController::class)->only(['index', 'store', 'update']);
+
+    Route::resource('employees', EmployeeController::class)->except(['show']);
+    Route::get('employees-filters/{column}', [EmployeeController::class, 'getFilterOptions'])->name('employees.filters');
+    Route::resource('employees.dependents', DependentController::class)->except(['index', 'show', 'create', 'edit']);
+
+    Route::get('visits', [VisitController::class, 'index'])->name('visits.index');
+    Route::get('visits-filters/{column}', [VisitController::class, 'getFilterOptions'])->name('visits.filters');
+    Route::get('visits/search', [VisitController::class, 'search'])->name('visits.search');
+    Route::post('visits', [VisitController::class, 'store'])->name('visits.store');
+    Route::get('visits/{visit}/edit', [VisitController::class, 'edit'])->name('visits.edit');
+    Route::delete('visits/{visit}', [VisitController::class, 'destroy'])->name('visits.destroy');
+    Route::post('visits/{visit}/departments', [VisitController::class, 'addDepartment'])->name('visits.departments.store');
+    Route::put('visits/{visit}/departments/{visitDepartment}', [VisitController::class, 'updateDepartmentAmount'])->name('visits.departments.update-amount');
+
     /* ********************************************************** */
 
     // Phase 5 placeholders — remove each line once its real controller/routes land
-    Route::get('visits', fn () => view('dashboard.pages.coming-soon', ['label' => 'الزيارات']))->name('visits.index');
-    Route::get('employees', fn () => view('dashboard.pages.coming-soon', ['label' => 'الموظفون والتابعون']))->name('employees.index');
-    Route::get('organization-units', fn () => view('dashboard.pages.coming-soon', ['label' => 'الوحدات التنظيمية']))->name('organization-units.index');
-    Route::get('medical-departments', fn () => view('dashboard.pages.coming-soon', ['label' => 'الأقسام الطبية']))->name('medical-departments.index');
     Route::get('survey-submissions', fn () => view('dashboard.pages.coming-soon', ['label' => 'طلبات الاستبيان']))->name('survey-submissions.index');
 });

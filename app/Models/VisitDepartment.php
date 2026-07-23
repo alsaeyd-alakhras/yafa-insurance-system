@@ -16,6 +16,7 @@ class VisitDepartment extends Model
         'visit_id',
         'medical_department_id',
         'applied_discount_percentage',
+        'applied_max_discount_amount',
         'amount_before_discount',
         'amount_after_discount',
         'added_at',
@@ -42,5 +43,20 @@ class VisitDepartment extends Model
     public function addedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'added_by');
+    }
+
+    public function calculateAmountAfterDiscount(): ?float
+    {
+        if ($this->amount_before_discount === null) {
+            return null;
+        }
+
+        $discountAmount = (float) $this->amount_before_discount * ((float) $this->applied_discount_percentage / 100);
+
+        if ($this->applied_max_discount_amount !== null) {
+            $discountAmount = min($discountAmount, (float) $this->applied_max_discount_amount);
+        }
+
+        return round((float) $this->amount_before_discount - $discountAmount, 2);
     }
 }

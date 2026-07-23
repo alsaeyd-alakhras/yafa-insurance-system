@@ -150,33 +150,42 @@
 
 مرجع: [`phase-5-entities.md`](phase-5-entities.md)
 
-- [ ] **5.1** Organization Unit (صفحة شجرية + Modal)
-  - [ ] 5.1.1 `OrganizationUnitController` (index شجري، store/update/destroy AJAX)
-  - [ ] 5.1.2 Views: `index.blade.php` + `_node.blade.php` + `_modal.blade.php`
-  - [ ] 5.1.3 حماية حذف وحدة لها أبناء/موظفين (رسالة عربية قبل محاولة FK)
-- [ ] **5.2** Medical Department (صفحة ثابتة 4 صفوف)
-  - [ ] 5.2.1 `MedicalDepartmentController` (index + update فقط)
-  - [ ] 5.2.2 View: `index.blade.php` (جدول عادي + Modal تعديل)
-- [ ] **5.3** Employee + Dependent
-  - [ ] 5.3.1 `EmployeeController` كامل (index Yajra, getFilterOptions, create, store, edit, update, destroy)
-  - [ ] 5.3.2 `DependentController` متداخل (store/update/destroy تحت employee، AJAX)
-  - [ ] 5.3.3 Views: `employees/{index,create,edit,_form}.blade.php` + قسم تابعين inline بصفحة التعديل
-  - [ ] 5.3.4 ربط `UniqueNationalId` rule بكل من Employee و Dependent
-- [ ] **5.4** User (إعادة كتابة كاملة)
-  - [ ] 5.4.1 إعادة كتابة `UserController` (index DataTable، store/update بصلاحيات RoleUser افتراضية حسب role، حذف مفاهيم person/phone)
-  - [ ] 5.4.2 `destroy()` بقيود حذف المستخدمين (راجع 2.5)
-  - [ ] 5.4.3 Views: `users/index.blade.php` + `_modal.blade.php`، تحديث `show.blade.php`/`settings.blade.php`
-  - [ ] 5.4.4 تفعيل `UserObserver::updated()`، حذف تسجيل يدوي مكرر بالكونترولر
-- [ ] **5.5** Visit (سير العمل المركزي)
-  - [ ] 5.5.1 `VisitController::index()` (DataTable + بطاقة بحث بالهوية)
-  - [ ] 5.5.2 `VisitController::search()` (تحديد المريض، فحص ازدواجية، فحص رصيد)
-  - [ ] 5.5.3 `VisitController::store()` (إنشاء + تسجيل نشاط)
-  - [ ] 5.5.4 `VisitController::edit()` + `addDepartment()`/`updateDepartmentAmount()` (snapshot خصم + إعادة حساب مجاميع عبر `Visit::recalculateTotals()`)
-  - [ ] 5.5.5 `VisitController::destroy()` (منطق ملكية عبر `VisitPolicy`)
-  - [ ] 5.5.6 Views: `visits/index.blade.php` + `visits/edit.blade.php`
-- [ ] **5.6** حذف `dashboard/aid_distributions/*` نهائياً (بعد ما `employees`/`visits` صاروا مرجع بديل فعلي)
+- [x] **5.1** Organization Unit (صفحة شجرية + Modal)
+  - [x] 5.1.1 `OrganizationUnitController` (index شجري، store/update/destroy AJAX)
+  - [x] 5.1.2 Views: `index.blade.php` + `_node.blade.php` + `_modal.blade.php`
+  - [x] 5.1.3 حماية حذف وحدة لها أبناء/موظفين (رسالة عربية قبل محاولة FK)
+- [x] **5.2** Medical Department (صفحة ثابتة، 5 صفوف فعّالة بعد تحديث السياسة — راجع القسم أدناه)
+  - [x] 5.2.1 `MedicalDepartmentController` (index + update فقط، يشمل `max_discount_amount`)
+  - [x] 5.2.2 View: `index.blade.php` (جدول عادي + Modal تعديل)
+  - [x] 5.2.3 **[إضافة]** Clinic (كيان جديد، راجع القسم أدناه): `ClinicController` + `ClinicPolicy` + views `clinics/index.blade.php` (DataTable بسيط + Modal)
+- [x] **5.3** Employee + Dependent
+  - [x] 5.3.1 `EmployeeController` كامل (index Yajra مع فلترة/فرز فعلية بالسيرفر، getFilterOptions، create، store، edit، update، destroy)
+  - [x] 5.3.2 `DependentController` متداخل (store/update/destroy تحت employee، مع فرض قواعد spouse/parent بمنطق التطبيق)
+  - [x] 5.3.3 Views: `employees/{index,create,edit,_form,_dependents}.blade.php` — قسم تابعين inline بصفحة التعديل
+  - [x] 5.3.4 ربط `UniqueNationalId` rule بكل من Employee و Dependent (موجود مسبقاً بالكود، فُعِّل بالكونترولرين)
+- [x] **5.4** User (إعادة كتابة كاملة)
+  - [x] 5.4.1 إعادة كتابة `UserController` (index DataTable، store/update بصلاحيات RoleUser افتراضية حسب role، حذف مفاهيم person/phone/user_type بالكامل)
+  - [x] 5.4.2 `destroy()` بقيود حذف المستخدمين (منع حذف الذات، منع حذف أدمن من قبل أدمن غير super_admin) — كانت موجودة مسبقاً بالكود القديم، أُبقيت كما هي
+  - [x] 5.4.3 Views: تحديث `_form.blade.php` (حذف حقل phone/person، `user_type`→`role`، تحديث JS الصلاحيات الافتراضية) — `index.blade.php`/`show.blade.php`/`settings.blade.php` كانت شغالة مسبقاً بدون تعديل
+  - [x] 5.4.4 تفعيل `UserObserver::updated()`، حذف تسجيل يدوي مكرر بالكونترولر (`update()`/`updateProfile()`)
+- [x] **5.5** Visit (سير العمل المركزي)
+  - [x] 5.5.1 `VisitController::index()` (DataTable كامل بنمط `aid_distributions` — sticky/فرز/فلترة + بطاقة بحث بالهوية والعيادة)
+  - [x] 5.5.2 `VisitController::search()` (تحديد المريض، فحص ازدواجية مريض+يوم+عيادة، فحص رصيد)
+  - [x] 5.5.3 `VisitController::store()` (إنشاء + تسجيل نشاط)
+  - [x] 5.5.4 `VisitController::edit()` + `addDepartment()`/`updateDepartmentAmount()` (snapshot خصم + حد أقصى + إعادة حساب مجاميع عبر `Visit::recalculateTotals()`)
+  - [x] 5.5.5 `VisitController::destroy()` (منطق ملكية عبر `VisitPolicy` — بالفعل صحيح بالكود قبل هذه المرحلة)
+  - [x] 5.5.6 Views: `visits/index.blade.php` + `visits/edit.blade.php`
+- [ ] **5.6** حذف `dashboard/aid_distributions/*` نهائياً — **[مؤجَّل صراحة]** `employees`/`visits` صاروا مرجع بديل فعلي وتأكّد عدم وجود أي مرجع آخر له بالكود، لكن أُبقي مؤقتاً بطلب صاحب المشروع لحين مراجعة كامل شغل هذه المرحلة أولاً
 
-**TESTING (شرط إغلاق المرحلة):** اختبار يدوي كامل بالمتصفح لكل كيان: إنشاء/تعديل/حذف (حسب الصلاحية)، فلاتر DataTable تشتغل، رسائل الأخطاء العربية تظهر صح.
+**تحديث سياسة أثناء هذه المرحلة (قبل البدء بـ 5.1):** وصل جدول خصومات رسمي جديد من الإدارة غيّر افتراضات موثّقة بـ Phase 3 — 5 أقسام طبية بدل 4 (إضافة بصريات/أسنان)، حد أقصى اختياري لمبلغ الخصم لكل قسم (`max_discount_amount`)، وكيان **Clinic** جديد كلياً يُربط بالزيارة (`visits.clinic_id`, nullable) ليغيّر نطاق تعريف الزيارة من (مريض+يوم) إلى (مريض+يوم+عيادة اختيارية). فُصِّل بالكامل بـ `docs/reference/01-entities.md`/`03-business-rules.md` المحدَّثين، ومُهاجَر عبر 4 migrations تعديلية جديدة (وليس تعديل migrations Phase 3 المُلتزَمة) — راجع `phase-3-migrations.md` لن يُحدَّث لأنه تاريخي، التحديث بالكامل بالمرجعين أعلاه.
+
+**تصحيح بگين حقيقيين اكتُشفا بالفحص المباشر أثناء البناء (ليسا معروفين مسبقاً):**
+- `OrganizationUnitController::validated()`: `Undefined array key 'parent_id'` عند إنشاء وحدة جذرية (بدون أب) — Laravel يُسقط المفاتيح الغائبة-لكن-nullable من نتيجة `validate()`. أُصلح بـ `?? null`.
+- `VisitController::store()`: خطأ PHP Parse Error حقيقي — `?->` غير مسموح داخل `"{$expr}"` بالـ string interpolation المباشر. أُصلح باستخراج المتغير قبل الجملة.
+- `Clinic` كان ناقص علاقة `visits()` — اكتُشف عند بناء فلتر العيادة بجدول الزيارات (`Call to undefined method Clinic::visits()`). أُضيفت.
+- `VisitController::addDepartment()`: محاولة إضافة نفس القسم الطبي مرتين لنفس الزيارة كانت تُطيح 500 خام (قيد unique بقاعدة البيانات بدون معالجة) بدل رسالة عربية — أُضيف فحص مسبق.
+
+**TESTING (تم فعلياً — ليس فقط شرط):** اختبار مباشر (curl + جلسة حقيقية admin) لكل كيان: CRUD كامل، حماية الحذف (FK)، فلاتر/فرز DataTable الفعلية بالسيرفر (وليس فقط الواجهة)، رسائل الأخطاء العربية، تسلسل الزيارة الكامل (بحث → فحص ازدواجية بالعيادة → فحص رصيد → إنشاء → إضافة أقسام → حساب خصم بحد أقصى → حذف)، صلاحيات `RoleUser` للاستقبال (403 صحيح على الكيانات غير الممنوحة، إخفاء صحيح بالـ nav). راجع تفاصيل الأرقام والنتائج بسجل المحادثة — لم تُلخَّص هنا لتفادي التكرار.
 
 ---
 

@@ -35,16 +35,6 @@
                         <x-form.input type="email" label="البريد الالكتروني" :value="$user->email" name="email"
                             placeholder="example@gmail.com" />
                     </div>
-                    @if (isset($settings_profile))
-                    <div class="mb-4 col-md-4">
-                        <x-form.input
-                            label="رقم الجوال"
-                            name="phone"
-                            :value="old('phone', $user->person?->phone ?? $user->phone)"
-                            placeholder="05xxxxxxxx"
-                        />
-                    </div>
-                    @endif
                     <div class="mb-4 col-md-4">
                         @if (isset($btn_label))
                             <x-form.input type="password" label="كلمة المرور" name="password" placeholder="****" />
@@ -60,16 +50,15 @@
                     </div>
                     @if(!isset($settings_profile))
                     <div class="mb-4 form-group col-md-4">
-                        <label for="user_type">نوع المستخدم</label>
-                        <select class="text-center form-select" name="user_type" id="user_type"
-                            data-placeholder="اختر النوع">
+                        <label for="role">الدور</label>
+                        <select class="text-center form-select" name="role" id="role"
+                            data-placeholder="اختر الدور">
                             <option value="" label="فتح القائمة">
-                            <option value="employee" @selected($user->user_type == 'employee')>الموظف</option>
-                            <option value="admin" @selected($user->user_type == 'admin')>المدير</option>
+                            <option value="receptionist" @selected($user->role == 'receptionist')>موظف استقبال</option>
+                            <option value="admin" @selected($user->role == 'admin')>أدمن</option>
                         </select>
                     </div>
                     @endif
-                    <x-form.input type="hidden" name="is_active" value="1" />
                 </div>
                 @if(!isset($settings_profile))
                     <div class="row">
@@ -139,7 +128,8 @@
         <script>
             $(document).ready(function () {
                 const isCreateUserForm = @json(!isset($btn_label));
-                const employeeDefaultAbilities = ['aiddistributions.view', 'aiddistributions.create', 'aiddistributions.update'];
+                const receptionistDefaultAbilities = ['visits.view', 'visits.create', 'visits.update', 'employees.view', 'dependents.view'];
+                const adminDefaultAbilities = @json(array_keys(app('abilities')));
 
                 // عند تغيير حالة Master Checkbox
                 $('.master-checkbox').on('change', function () {
@@ -159,26 +149,32 @@
                     });
                 }
 
-                function applyEmployeeDefaultAbilitiesOnCreate() {
-                    if (!isCreateUserForm || $('#user_type').val() !== 'employee') {
+                function applyRoleDefaultAbilitiesOnCreate() {
+                    if (!isCreateUserForm) {
                         return;
                     }
 
-                    $('input[name="abilities[]"]').each(function () {
-                        const role = $(this).val();
-                        if (employeeDefaultAbilities.includes(role)) {
-                            $(this).prop('checked', true);
-                        }
-                    });
+                    const role = $('#role').val();
+                    $('input[name="abilities[]"]').prop('checked', false);
+
+                    if (role === 'receptionist') {
+                        $('input[name="abilities[]"]').each(function () {
+                            if (receptionistDefaultAbilities.includes($(this).val())) {
+                                $(this).prop('checked', true);
+                            }
+                        });
+                    } else if (role === 'admin') {
+                        $('input[name="abilities[]"]').prop('checked', true);
+                    }
 
                     syncMasterCheckboxes();
                 }
 
-                $('#user_type').on('change', function () {
-                    applyEmployeeDefaultAbilitiesOnCreate();
+                $('#role').on('change', function () {
+                    applyRoleDefaultAbilitiesOnCreate();
                 });
 
-                $('#user_type').trigger('change');
+                $('#role').trigger('change');
             });
 
         </script>

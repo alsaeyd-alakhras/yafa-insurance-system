@@ -37,6 +37,12 @@ return [
         'view' => 'عرض',
         'update' => 'تعديل',
     ],
+    'clinics' => [
+        'name' => 'العيادات',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+    ],
     'employees' => [
         'name' => 'الموظفون',
         'view' => 'عرض',

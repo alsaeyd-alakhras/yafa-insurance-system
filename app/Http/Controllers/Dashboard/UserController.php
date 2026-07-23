@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\RoleUser;
 use App\Models\User;
-use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,10 +13,12 @@ use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
-    private const EMPLOYEE_DEFAULT_ABILITIES = [
-        'aiddistributions.view',
-        'aiddistributions.create',
-        'aiddistributions.update',
+    private const RECEPTIONIST_DEFAULT_ABILITIES = [
+        'visits.view',
+        'visits.create',
+        'visits.update',
+        'employees.view',
+        'dependents.view',
     ];
 
     /**
@@ -27,7 +28,9 @@ class UserController extends Controller
     {
         $this->authorize('view', User::class);
 
-        return redirect()->route('dashboard.directory.index');
+        $users = User::orderBy('name')->paginate(20);
+
+        return view('dashboard.users.index', compact('users'));
     }
 
     /**
@@ -37,7 +40,9 @@ class UserController extends Controller
     {
         $this->authorize('create', User::class);
 
-        return redirect()->route('dashboard.directory.create', ['mode' => 'user_only']);
+        $user = new User(['role' => 'receptionist']);
+
+        return view('dashboard.users.create', compact('user'));
     }
 
     /**
@@ -47,33 +52,42 @@ class UserController extends Controller
     {
         $this->authorize('create', User::class);
 
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required',
             'username' => 'required|string|unique:users,username',
+            'email' => 'nullable|email',
             'password' => 'required|same:confirm_password',
             'confirm_password' => 'required|same:password',
-            'user_type' => 'required|in:admin,employee',
-            'is_active' => 'required|boolean',
+            'role' => 'required|in:admin,receptionist',
         ], [
             'password.same' => 'كلمة المرور غير متطابقة',
             'confirm_password.same' => 'كلمة المرور غير متطابقة',
         ]);
-        $abilities = $this->normalizeAbilitiesForUserType(
-            $request->user_type,
+
+        $abilities = $this->normalizeAbilitiesForRole(
+            $validated['role'],
             $request->input('abilities', [])
         );
 
         DB::beginTransaction();
         try {
-            if ($request->has('avatar')) {
-                $avatar = $request->file('avatar');
-                $path = $avatar->store('avatars', 'public');
-                $request->merge(['avatar' => $path]);
+            $path = null;
+            if ($request->hasFile('avatarUpload')) {
+                $path = $request->file('avatarUpload')->store('avatars', 'public');
             }
-            $user = User::create($request->all());
-            foreach ($abilities as $role) {
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'] ?? null,
+                'password' => $validated['password'],
+                'role' => $validated['role'],
+                'avatar' => $path,
+            ]);
+
+            foreach ($abilities as $ability) {
                 RoleUser::create([
-                    'role_name' => $role,
+                    'role_name' => $ability,
                     'user_id' => $user->id,
                     'ability' => 'allow',
                 ]);
@@ -83,7 +97,8 @@ class UserController extends Controller
             DB::rollBack();
             return redirect()->back()->with('error', $e->getMessage());
         }
-        return redirect()->route('dashboard.directory.index')->with('success', 'تم اضافة مستخدم جديد');
+
+        return redirect()->route('dashboard.users.index')->with('success', 'تم اضافة مستخدم جديد');
     }
 
     /**
@@ -91,7 +106,6 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-
         if (Auth::user()->id != $user->id && !Auth::user()->can('view', User::class)) {
             abort(403);
         }
@@ -110,41 +124,6 @@ class UserController extends Controller
         return view('dashboard.users.settings', compact('user'));
     }
 
-    public function completePhone()
-    {
-        $user = Auth::user();
-
-        if ($user->super_admin || ! empty($user->person?->phone)) {
-            return redirect()->route('dashboard.home');
-        }
-
-        return view('dashboard.profile.complete-phone');
-    }
-
-    public function storeCompletePhone(Request $request)
-    {
-        $user = Auth::user();
-        $person = $user->person;
-
-        abort_unless($person, 404);
-
-        $validated = $request->validate([
-            'phone' => ['required', 'string', 'max:50'],
-        ]);
-
-        $person->update([
-            'phone' => $validated['phone'],
-        ]);
-
-        $user->update([
-            'phone' => $validated['phone'],
-        ]);
-
-        return redirect()
-            ->route('dashboard.home')
-            ->with('success', 'تم حفظ رقم الجوال بنجاح.');
-    }
-
     /**
      * Show the form for editing the specified resource.
      */
@@ -152,11 +131,7 @@ class UserController extends Controller
     {
         $this->authorize('update', User::class);
 
-        if ($user->person) {
-            return redirect()->route('dashboard.directory.edit', 'person:' . $user->person->id);
-        }
-
-        return redirect()->route('dashboard.directory.edit', 'user:' . $user->id);
+        return view('dashboard.users.edit', compact('user'));
     }
 
     /**
@@ -170,7 +145,6 @@ class UserController extends Controller
             'name' => 'required',
             'username' => 'required|string|unique:users,username,' . $user->id,
             'email' => 'nullable|email',
-            'phone' => ['nullable', 'string', 'max:50'],
         ];
 
         if ($request->filled('password')) {
@@ -185,7 +159,6 @@ class UserController extends Controller
 
         DB::beginTransaction();
         try {
-            $userOld = $user->toArray();
             $oldAvatar = $user->avatar;
 
             if ($request->hasFile('avatarUpload')) {
@@ -201,7 +174,6 @@ class UserController extends Controller
                 'name' => $validated['name'],
                 'username' => $validated['username'],
                 'email' => $request->email,
-                'phone' => $validated['phone'] ?? null,
                 'avatar' => $path,
             ];
 
@@ -210,21 +182,6 @@ class UserController extends Controller
             }
 
             $user->update($updateData);
-
-            if ($user->person) {
-                $user->person->update([
-                    'name' => $validated['name'],
-                    'phone' => $validated['phone'] ?? null,
-                ]);
-            }
-
-            ActivityLogService::log(
-                'Updated',
-                'User',
-                "تم تحديث الملف الشخصي : {$user->name}.",
-                $userOld,
-                $user->getChanges()
-            );
 
             DB::commit();
         } catch (\Exception $e) {
@@ -241,60 +198,59 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $this->authorize('update', User::class);
-        $request->validate([
+
+        $validated = $request->validate([
             'name' => 'required',
             'username' => 'required|string|unique:users,username,' . $user->id,
+            'email' => 'nullable|email',
+            'role' => 'required|in:admin,receptionist',
         ]);
+
         DB::beginTransaction();
         try {
-            $userOld = $user->toArray();
             $oldAvatar = $user->avatar;
-            if ($request->has('avatarUpload')) {
-                if ($oldAvatar != null) {
+
+            $path = $oldAvatar;
+            if ($request->hasFile('avatarUpload')) {
+                if ($oldAvatar !== null) {
                     Storage::disk('public')->delete($oldAvatar);
                 }
-                $avatar = $request->file('avatarUpload');
-                $path = $avatar->store('avatars', 'public');
-                $request->merge(['avatar' => $path]);
+                $path = $request->file('avatarUpload')->store('avatars', 'public');
             }
-            $avatar = $request->avatar ?? $user->avatar;
-            if (isset($request->password)) {
-                $user->update($request->all());
+
+            $updateData = [
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'] ?? null,
+                'avatar' => $path,
+                'role' => $validated['role'],
+            ];
+
+            if ($request->filled('password')) {
+                $updateData['password'] = $request->password;
             }
-            $nextUserType = $request->user_type ?? $user->user_type;
-            $abilities = $this->normalizeAbilitiesForUserType(
-                $nextUserType,
+
+            $user->update($updateData);
+
+            $abilities = $this->normalizeAbilitiesForRole(
+                $validated['role'],
                 $request->input('abilities', [])
             );
-
-            $user->update([
-                'name' => $request->name,
-                'username' => $request->username,
-                'email' => $request->email,
-                'avatar' => $avatar ?? null,
-                'user_type' => $nextUserType,
-                'is_active' => $request->is_active ?? $user->is_active,
-            ]);
             $this->syncUserAbilities($user, $abilities);
-            ActivityLogService::log(
-                'Updated',
-                'User',
-                "تم تحديث المستخدم : {$user->name}.",
-                $userOld,
-                $user->getChanges()
-            );
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
-        return redirect()->route('dashboard.directory.index')->with('success', 'تم تعديل المستخدم');
+
+        return redirect()->route('dashboard.users.index')->with('success', 'تم تعديل المستخدم');
     }
 
-    private function normalizeAbilitiesForUserType(string $userType, array $abilities): array
+    private function normalizeAbilitiesForRole(string $role, array $abilities): array
     {
-        if ($userType === 'employee') {
-            return array_values(array_unique(array_merge(self::EMPLOYEE_DEFAULT_ABILITIES, $abilities)));
+        if ($role === 'receptionist') {
+            return array_values(array_unique(array_merge(self::RECEPTIONIST_DEFAULT_ABILITIES, $abilities)));
         }
 
         return array_values(array_unique($abilities));
@@ -336,6 +292,6 @@ class UserController extends Controller
             Storage::disk('public')->delete($user->avatar);
         }
         $user->delete();
-        return redirect()->route('dashboard.directory.index')->with('success', 'تم حذف المستخدم');
+        return redirect()->route('dashboard.users.index')->with('success', 'تم حذف المستخدم');
     }
 }

@@ -12,5 +12,5 @@ class MedicalDepartment extends Model
     const CREATED_AT = null;
     const UPDATED_AT = 'updated_at';
 
-    protected $fillable = ['name', 'discount_percentage', 'is_active'];
+    protected $fillable = ['name', 'discount_percentage', 'max_discount_amount', 'is_active'];
 }

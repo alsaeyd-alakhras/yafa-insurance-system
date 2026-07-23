@@ -26,8 +26,13 @@ class UserObserver
      */
     public function updated(User $user): void
     {
-        
-        
+        ActivityLogService::log(
+            'Updated',
+            'User',
+            "تم تحديث المستخدم : {$user->name}.",
+            $user->getOriginal(),
+            $user->getChanges()
+        );
     }
 
     /**

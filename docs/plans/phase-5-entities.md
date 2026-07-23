@@ -7,8 +7,10 @@
 ## ترتيب البناء
 
 ```
-Organization Unit → Medical Department → Employee (+Dependent متداخل) → User → Visit
+Organization Unit → Medical Department → Clinic → Employee (+Dependent متداخل) → User → Visit
 ```
+
+**تحديث سياسة (بعد اعتماد جدول خصومات رسمي جديد، راجع `docs/reference/01-entities.md` §4/§4ب و`03-business-rules.md` §2/§3/§7):** الأقسام الطبية أصبحت خمسة (كشف طبي 100%، صيدلية 25%، مختبر 25%، بصريات 25%، أسنان 25%) بدل أربعة، بعضها له حد أقصى لمبلغ الخصم (`max_discount_amount`)، وأُضيف كيان **Clinic** جديد كلياً يُختار عند تسجيل زيارة كشف طبي.
 (Survey Submission بالمرحلة 6 — سير عمل خاص يمتد بين صفحة عامة ولوحة الأدمن، مش CRUD عادي.)
 
 ## مرجع نمط DataTable الحالي
@@ -31,15 +33,26 @@ Organization Unit → Medical Department → Employee (+Dependent متداخل) 
 
 ## 5.2 Medical Department
 
-**القرار: صفحة واحدة بجدول ثابت من 4 صفوف، تعديل `discount_percentage`/`is_active` فقط عبر Modal — بدون إنشاء أو حذف.**
+**القرار: صفحة واحدة بجدول ثابت من 5 صفوف فعّالة (+ صف `radiology` معطّل تاريخياً غير معروض)، تعديل `discount_percentage`/`max_discount_amount`/`is_active` فقط عبر Modal — بدون إنشاء أو حذف.**
 
-**السبب:** الأقسام الأربعة ثابتة حسب الوثيقة صراحة ("الأقسام الأربعة ثابتة") — لا حالة استخدام لإنشاء أو حذف قسم (UC-A5 يذكر فقط تعديل `discount_percentage`/`is_active`). بناء DataTable+CRUD كامل لجدول دايماً بـ4 صفوف تعقيد بدون داعٍ.
+**السبب:** الأقسام ثابتة حسب الجدول الرسمي المعتمد (كشف طبي/صيدلية/مختبر/بصريات/أسنان) — لا حالة استخدام لإنشاء أو حذف قسم. بناء DataTable+CRUD كامل لجدول دايماً بعدد صفوف ثابت تعقيد بدون داعٍ. **تحديث:** حقل `max_discount_amount` الجديد (nullable) يُعدَّل من نفس الـ Modal جنباً إلى جنب مع `discount_percentage` — لا قيد شرطي بينهما بالفورم (الحقل مستقل، ممكن معبّى بغض النظر عن قيمة النسبة).
 
 **الملفات:**
-- `app/Http/Controllers/Dashboard/MedicalDepartmentController.php` — `index` يعرض الـ 4، `update` فقط (عبر Modal بسيط أو نموذج inline).
-- `resources/views/dashboard/medical_departments/index.blade.php` — جدول Bootstrap عادي، بدون DataTable JS.
+- `app/Http/Controllers/Dashboard/MedicalDepartmentController.php` — `index` يعرض الصفوف الفعّالة فقط (`is_active = true`)، `update` فقط (عبر Modal بسيط أو نموذج inline، يشمل `max_discount_amount`).
+- `resources/views/dashboard/medical_departments/index.blade.php` — جدول Bootstrap عادي، بدون DataTable JS، عمود إضافي لعرض الحد الأقصى (أو "بدون حد" لو null).
 - مرجع النمط: `ConstantController` (أقرب مثال موجود لمجموعة إعدادات ثابتة صغيرة).
 - **لا routes لـ store/destroy إطلاقاً** — `Route::resource(..., ['only' => ['index', 'update']])`.
+
+## 5.2ب Clinic (كيان جديد)
+
+**القرار: صفحة DataTable بسيطة + Modal للإنشاء/التعديل/التعطيل — نفس نمط User (5.4) وليس نمط Medical Department (قائمة مفتوحة، ليست صفوف ثابتة).**
+
+**السبب:** العيادات قائمة مفتوحة تُدار من الإدارة (إضافة عيادة جديدة، تعطيل عيادة قديمة) — على عكس الأقسام الطبية الخمسة الثابتة. حقول قليلة (اسم فقط + `is_active`) تبرر Modal بدل صفحة منفصلة.
+
+**الملفات:**
+- `app/Http/Controllers/Dashboard/ClinicController.php` — `index` (DataTable أو قائمة بسيطة إن كان العدد صغيراً)، `store`/`update`/`destroy` (`destroy` عملياً تعطيل `is_active=false` وليس حذف فعلي، بما إن `visits.clinic_id` محمي بـ `restrictOnDelete` — لو فيه زيارات مرتبطة، الحذف الفعلي يفشل على مستوى DB، فمن الأفضل تعطيل مباشرة بدل محاولة حذف).
+- `resources/views/dashboard/clinics/index.blade.php` + `_modal.blade.php`.
+- `ActivityLogService::log('clinic_created'|'clinic_updated', 'Clinic', ...)`.
 
 ## 5.3 Employee (+ Dependent متداخل)
 
@@ -76,10 +89,10 @@ Organization Unit → Medical Department → Employee (+Dependent متداخل) 
 **الملفات:**
 - `app/Http/Controllers/Dashboard/VisitController.php`:
   - `index()` — DataTable لكل الزيارات، فلترة بالتاريخ/اسم المريض/القسم — ظاهر لكلا الدورين.
-  - `search(Request $request)` — method جديد (ليس CRUD قياسي): يستقبل `national_id`، يحدد إذا المريض موظف أو تابع، يحدد الموظف صاحب الرصيد، يفحص وجود زيارة اليوم لنفس المريض بالضبط — يرجّع إما توجيه لصفحة تعديل الزيارة الموجودة، أو حالة الرصيد (X/2) لبدء إنشاء زيارة جديدة. أهم method بالكامل — ينفّذ workflow §2 بالوثيقة حرفياً.
-  - `store(Request $request)` — ينشئ الزيارة (فقط لو فحص الرصيد نجح)، `recorded_by = auth()->id()`، تسجيل `visit_created`.
+  - `search(Request $request)` — method جديد (ليس CRUD قياسي): يستقبل `national_id` + `clinic_id` اختياري (يُختار لو الاستقبال ناوي يسجّل كشف طبي)، يحدد إذا المريض موظف أو تابع، يحدد الموظف صاحب الرصيد، يفحص وجود زيارة اليوم لنفس المريض **+ نفس `clinic_id`** (أو بدون عيادة إن لم يُختر `clinic_id`) — يرجّع إما توجيه لصفحة تعديل الزيارة الموجودة، أو حالة الرصيد (X/2) لبدء إنشاء زيارة جديدة. أهم method بالكامل — ينفّذ workflow §2 المحدَّث بالوثيقة حرفياً (مريض+يوم+عيادة، انظر `03-business-rules.md` §2).
+  - `store(Request $request)` — ينشئ الزيارة (فقط لو فحص الرصيد نجح)، `clinic_id` من نتيجة البحث (nullable)، `recorded_by = auth()->id()`، تسجيل `visit_created`.
   - `edit(Visit $visit)` — يعرض الزيارة + أقسامها الحالية + نموذج إضافة قسم جديد/تعديل مبلغ قسم موجود.
-  - `addDepartment(...)` / `updateDepartmentAmount(...)` — نسخ `applied_discount_percentage` وقت الإضافة فقط (لا يُعاد نسخه عند تعديل المبلغ لاحقاً)، إعادة حساب `amount_after_discount` بالسيرفر دائماً، ثم إعادة حساب وحفظ `visits.total_before_discount`/`total_after_discount` (مجموع كل صفوف `visit_departments`) عبر method قابل لإعادة الاستخدام (`Visit::recalculateTotals()` أو service مخصص) — لا تكرار لهذا المنطق. تحديث `last_updated_by`، تسجيل `visit_updated`.
+  - `addDepartment(...)` / `updateDepartmentAmount(...)` — نسخ `applied_discount_percentage` **و `applied_max_discount_amount`** وقت الإضافة فقط (لا يُعاد نسخهم عند تعديل المبلغ لاحقاً)، الاستقبال يُدخل `amount_before_discount` فقط، `amount_after_discount` يُحسب دائماً بالسيرفر عبر `MIN(amount_before_discount × applied_discount_percentage / 100, applied_max_discount_amount ?? INF)` (منطق مقترح كـ method على `VisitDepartment`، مثلاً `calculateAmountAfterDiscount()`)، ثم إعادة حساب وحفظ `visits.total_before_discount`/`total_after_discount` (مجموع كل صفوف `visit_departments`) عبر method قابل لإعادة الاستخدام (`Visit::recalculateTotals()` أو service مخصص) — لا تكرار لهذا المنطق. تحديث `last_updated_by`، تسجيل `visit_updated`.
   - `destroy(Visit $visit)` — **[محسوم، مُعدَّل عن التوصية المبدئية]** حذف مباشر (hard delete)، **ليس** ممنوعاً بالكامل كما كانت التوصية الأولى. الصلاحية تُفحص عبر `VisitPolicy::delete()` (تفصيلها الكامل بـ `phase-2-auth-authorization.md` §2.4): مستخدم بصلاحية `visits.delete` العامة (افتراضياً الأدمن) يحذف أي زيارة؛ مستخدم بصلاحية `visits.delete-own` فقط (افتراضياً الاستقبال) يحذف فقط الزيارات التي `recorded_by = هو`. لا حالة "ملغية" وسيطة — حذف نهائي مباشر. تسجيل `visit_deleted` بـ `activity_logs` (يشمل مين حذف ومتى).
 - Views: `resources/views/dashboard/visits/index.blade.php` (DataTable + بطاقة بحث بالهوية مدمجة أعلى الصفحة أو ضمن `extra_nav`، بدل صفحة بحث منفصلة — تقليل عدد الصفحات؛ زر حذف بعمود الإجراءات يظهر فقط عبر `@can('delete', $visit)` — يتقلص تلقائياً للاستقبال ليشمل فقط صفوفه هو بحكم منطق `VisitPolicy::delete()`)، `resources/views/dashboard/visits/edit.blade.php` (معلومات المريض، حالة الرصيد الشهري، قائمة أقسام الزيارة الحالية بحقول مبلغ قابلة للتعديل، نموذج مصغّر لإضافة قسم من `medical_departments` النشطة غير المضافة مسبقاً لهذه الزيارة، وزر حذف الزيارة كاملة بنفس شرط `@can`) — تأكيد الحذف عبر `components/confirm-modal.blade.php` الموجود.
 - **لا `create.blade.php` منفصلة** — الإنشاء يحصل عبر AJAX من نتيجة البحث مباشرة لـ `store()`، ثم إعادة توجيه لـ `edit.blade.php` لنفس الزيارة الجديدة — يطابق حرفياً نهاية workflow §2 بالوثيقة ("إعادة التوجيه لصفحة الزيارة القائمة لإضافة/تعديل الأقسام").

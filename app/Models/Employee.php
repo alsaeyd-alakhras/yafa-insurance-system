@@ -42,4 +42,17 @@ class Employee extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function visitsThisMonth(): int
+    {
+        return Visit::where('employee_id', $this->id)
+            ->whereYear('visit_date', now()->year)
+            ->whereMonth('visit_date', now()->month)
+            ->count();
+    }
+
+    public function remainingQuota(): int
+    {
+        return max(0, 2 - $this->visitsThisMonth());
+    }
 }
