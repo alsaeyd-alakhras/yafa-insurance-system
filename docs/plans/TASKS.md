@@ -193,19 +193,19 @@
 
 مرجع: [`phase-6-workflows.md`](phase-6-workflows.md)
 
-- [ ] **6.1** إعداد نافذة الاستبيان الزمنية (مدخلات `constants` جديدة + `SurveyWindowService::isOpen()`)
-- [ ] **6.2** نموذج الاستبيان العام
-  - [ ] 6.2.1 `SurveySubmissionPublicController` + routes بـ `routes/web.php`
-  - [ ] 6.2.2 `layouts/public-layout.blade.php` + `survey/form.blade.php`
-  - [ ] 6.2.3 فحص تفرّد الهوية اللحظي (AJAX) + عند التقديم
-- [ ] **6.3** لوحة مراجعة الأدمن للاستبيانات
-  - [ ] 6.3.1 `SurveySubmissionController` (index, show, approve, reject)
-  - [ ] 6.3.2 `approve()` — إنشاء Employee+Dependents من raw_data داخل transaction + إعادة فحص تفرّد الهوية
-  - [ ] 6.3.3 Views: `survey_submissions/{index,show}.blade.php`
-- [ ] **6.4** حساب الرصيد الشهري — `Employee::visitsThisMonth()`/`remainingQuota()`
-- [ ] **6.5** ربط نهائي: تدفق تسجيل الزيارة الكامل من البحث للحفظ (اختبار end-to-end)
+- [x] **6.1** إعداد نافذة الاستبيان الزمنية — **[معدَّل عن الخطة الأصلية]** `SurveyWindowService` يقرأ/يكتب جدول `constants` مباشرة (`survey_window_start`/`survey_window_end`)، **بدون المرور عبر `ConstantController`**. السبب: `data/constants-registry.php` اللي يقرأه `ConstantController` غير موجود أصلاً بالكود (بگ موثّق من مراجعة سابقة، `/constants` معطّل 500 حالياً لأي مستخدم) — قرار صريح من صاحب المشروع بعدم لمس `ConstantController` بهذه المرحلة والاكتفاء بخدمة مستقلة. واجهة ضبط التاريخ (بداية/نهاية) أُضيفت كبطاقة أعلى صفحة `survey_submissions/index.blade.php` بدل صفحة `/constants`.
+- [x] **6.2** نموذج الاستبيان العام
+  - [x] 6.2.1 `SurveySubmissionPublicController` + routes بـ `routes/web.php` (`GET/POST /survey`, `GET /survey/check-national-id/{id}`) — بدون middleware مصادقة إطلاقاً
+  - [x] 6.2.2 `components/public-layout.blade.php` (وليس `layouts/public-layout.blade.php` كما بالخطة الأصلية — Blade يكتشف مكونات `<x-*>` تلقائياً فقط من `resources/views/components/`) + `survey/form.blade.php` + `survey/closed.blade.php` (رسالة عند إغلاق النافذة)
+  - [x] 6.2.3 فحص تفرّد الهوية اللحظي (AJAX عبر `fetch`) + إعادة الفحص الكامل عند `POST /survey` (موظف + كل تابع على حدة + `survey_submissions` المعلّقة الأخرى)
+- [x] **6.3** لوحة مراجعة الأدمن للاستبيانات
+  - [x] 6.3.1 `SurveySubmissionController` (index مع فلتر status + بطاقة ضبط النافذة الزمنية، show، approve، reject) + `updateWindow()` إضافية
+  - [x] 6.3.2 `approve()` — إنشاء Employee+Dependents من raw_data داخل `DB::transaction()` + إعادة فحص تفرّد الهوية عبر استدعاء مباشر لـ `UniqueNationalId::validate()` (نفس الـ rule المستخدم بـ Employee/Dependent) + حماية ضد مراجعة مزدوجة (status != pending)
+  - [x] 6.3.3 Views: `survey_submissions/{index,show}.blade.php` — أزرار موافقة/رفض عبر `confirm-modal`
+- [x] **6.4** حساب الرصيد الشهري — تم فعلياً ضمن Phase 5 (`Employee::visitsThisMonth()`/`remainingQuota()` موجودان ومُستخدمان بـ `VisitController::search()`/`store()` منذ ذلك الحين)
+- [x] **6.5** ربط نهائي لتدفق تسجيل الزيارة — تم فعلياً ضمن Phase 5 بالكامل (`VisitController` مبني ومُختبر live بكل التفاصيل: بحث، ازدواجية بالعيادة، رصيد، إنشاء، إضافة أقسام بخصم وحد أقصى)؛ لا عمل إضافي احتاجته هذه المرحلة
 
-**TESTING (شرط إغلاق المرحلة):** تعبئة استبيان كامل (موظف + تابعين) من نافذة متصفح خاصة (بدون تسجيل دخول) → موافقة الأدمن → التأكد من ظهور الموظف الجديد بصفحة employees. تسجيل زيارة كاملة: بحث → إنشاء → إضافة قسمين → محاولة تكرار بنفس اليوم (يجب التوجيه للزيارة الموجودة) → استهلاك الزيارتين واختبار رفض الزيارة الثالثة بنفس الشهر.
+**TESTING (تم فعلياً — ليس فقط شرط):** اختبار مباشر (curl + جلستين منفصلتين: عامة بدون مصادقة + admin) للتدفق الكامل: فورم مغلق افتراضياً (بدون نافذة مضبوطة) → admin يضبط النافذة → الفورم يفتح فعلياً → فحص هوية AJAX لحظي → تقديم استبيان كامل (موظف + تابع زوج) → تحقق من `raw_data` المخزّن كاملاً → رفض تقديم مكرر بنفس الهوية (سواء موظف موجود أو طلب pending آخر) → admin يشوف الطلب بالقائمة والتفاصيل → موافقة → تحقق من إنشاء Employee (source=survey, status=active, approved_by مضبوط) + Dependent مرتبط صح + `survey_submissions.status/created_employee_id` محدَّثين → تحقق ظهور الموظف الجديد فعلياً بصفحة `employees` (DataTable) → طلب ثاني اختبار الرفض (status=rejected, بدون إنشاء موظف) → حماية مراجعة مزدوجة (منع الموافقة/الرفض مرتين) تعمل صح.
 
 ---
 

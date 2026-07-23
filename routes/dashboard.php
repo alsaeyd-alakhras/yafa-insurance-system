@@ -11,6 +11,7 @@ use App\Http\Controllers\Dashboard\EmployeeController;
 use App\Http\Controllers\Dashboard\HomeController;
 use App\Http\Controllers\Dashboard\MedicalDepartmentController;
 use App\Http\Controllers\Dashboard\OrganizationUnitController;
+use App\Http\Controllers\Dashboard\SurveySubmissionController;
 use App\Http\Controllers\Dashboard\UserController;
 use App\Http\Controllers\Dashboard\VisitController;
 use Illuminate\Support\Facades\Route;
@@ -61,8 +62,9 @@ Route::group([
     Route::post('visits/{visit}/departments', [VisitController::class, 'addDepartment'])->name('visits.departments.store');
     Route::put('visits/{visit}/departments/{visitDepartment}', [VisitController::class, 'updateDepartmentAmount'])->name('visits.departments.update-amount');
 
-    /* ********************************************************** */
-
-    // Phase 5 placeholders — remove each line once its real controller/routes land
-    Route::get('survey-submissions', fn () => view('dashboard.pages.coming-soon', ['label' => 'طلبات الاستبيان']))->name('survey-submissions.index');
+    Route::get('survey-submissions', [SurveySubmissionController::class, 'index'])->name('survey-submissions.index');
+    Route::put('survey-submissions-window', [SurveySubmissionController::class, 'updateWindow'])->name('survey-submissions.update-window');
+    Route::get('survey-submissions/{surveySubmission}', [SurveySubmissionController::class, 'show'])->name('survey-submissions.show');
+    Route::post('survey-submissions/{surveySubmission}/approve', [SurveySubmissionController::class, 'approve'])->name('survey-submissions.approve');
+    Route::post('survey-submissions/{surveySubmission}/reject', [SurveySubmissionController::class, 'reject'])->name('survey-submissions.reject');
 });
