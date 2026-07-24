@@ -2,7 +2,99 @@
     $oldDependents = collect(old('dependents', []))->values();
 @endphp
 
-<div class="card mb-4">
+@push('styles')
+    <style>
+        .dependent-card .card-header {
+            background: rgba(67, 89, 113, .02);
+        }
+
+        .dependent-card.is-section-disabled .card-body {
+            opacity: .55;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .dependent-card .btn-add-dependent-row:disabled {
+            opacity: .5;
+        }
+
+        .dependent-section-note {
+            display: none;
+            align-items: center;
+            gap: .5rem;
+            padding: .65rem .9rem;
+            border-radius: .5rem;
+            background: rgba(255, 171, 0, .08);
+            color: #a17700;
+            font-size: .8125rem;
+        }
+
+        .dependent-section-note.is-visible {
+            display: flex;
+        }
+
+        .dependent-row {
+            position: relative;
+            background: #fff;
+            border: 1px solid rgba(67, 89, 113, .16);
+            border-right: 4px solid #696cff;
+            border-radius: .5rem;
+            box-shadow: 0 .125rem .375rem rgba(67, 89, 113, .08);
+            padding: 1rem;
+        }
+
+        .dependent-row + .dependent-row {
+            margin-top: .9rem;
+        }
+
+        .dependent-row[data-type="child"] {
+            border-right-color: #71dd37;
+        }
+
+        .dependent-row[data-type="parent"] {
+            border-right-color: #03c3ec;
+        }
+
+        .dependent-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+            margin-bottom: .85rem;
+            padding-bottom: .6rem;
+            border-bottom: 1px dashed rgba(67, 89, 113, .16);
+        }
+
+        .dependent-row-title {
+            font-weight: 600;
+            color: #566a7f;
+        }
+
+        .dependent-limit-message {
+            margin-top: .75rem;
+            padding: .5rem .85rem;
+            border-radius: .5rem;
+            font-size: .8125rem;
+            display: none;
+        }
+
+        .dependent-limit-message.is-visible {
+            display: block;
+        }
+
+        .dependent-limit-message.is-info {
+            background: rgba(105, 108, 255, .1);
+            color: #696cff;
+        }
+
+        .dependent-limit-message.is-warning {
+            background: rgba(255, 62, 29, .1);
+            color: #ff3e1d;
+        }
+    </style>
+@endpush
+
+<div class="card mb-4 dependent-card" id="spouse-card" data-type="spouse">
     <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <h5 class="mb-0">الزوجات/الزوج</h5>
         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="spouse">
@@ -10,13 +102,17 @@
         </button>
     </div>
     <div class="card-body">
+        <p class="dependent-section-note" data-note-for="spouse">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>هذا القسم متاح فقط عند اختيار حالة زوجية "متزوج/ة" أو "متعدد الزوجات".</span>
+        </p>
         <div id="spouse-rows" class="dependent-section" data-type="spouse"></div>
         <p class="text-muted small mb-0 empty-dependent-message">لا يوجد زوج/ة مضافون بعد.</p>
-        <p class="small mb-0 dependent-limit-message" data-type="spouse" aria-live="polite"></p>
+        <p class="dependent-limit-message" data-type="spouse" aria-live="polite"></p>
     </div>
 </div>
 
-<div class="card mb-4">
+<div class="card mb-4 dependent-card" id="child-card" data-type="child">
     <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <h5 class="mb-0">الأبناء</h5>
         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="child">
@@ -24,12 +120,16 @@
         </button>
     </div>
     <div class="card-body">
+        <p class="dependent-section-note" data-note-for="child">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>هذا القسم غير متاح عند اختيار حالة زوجية "أعزب/عزباء".</span>
+        </p>
         <div id="child-rows" class="dependent-section" data-type="child"></div>
         <p class="text-muted small mb-0 empty-dependent-message">لا يوجد أبناء مضافون بعد.</p>
     </div>
 </div>
 
-<div class="card mb-4">
+<div class="card mb-4 dependent-card" id="parent-card" data-type="parent">
     <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <h5 class="mb-0">الآباء</h5>
         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="parent">
@@ -39,7 +139,7 @@
     <div class="card-body">
         <div id="parent-rows" class="dependent-section" data-type="parent"></div>
         <p class="text-muted small mb-0 empty-dependent-message">لا يوجد آباء مضافون بعد.</p>
-        <p class="small mb-0 dependent-limit-message" data-type="parent" aria-live="polite"></p>
+        <p class="dependent-limit-message" data-type="parent" aria-live="polite"></p>
     </div>
 </div>
 
@@ -52,6 +152,11 @@
                 spouse: document.getElementById('spouse-rows'),
                 child: document.getElementById('child-rows'),
                 parent: document.getElementById('parent-rows'),
+            };
+            const cards = {
+                spouse: document.getElementById('spouse-card'),
+                child: document.getElementById('child-card'),
+                parent: document.getElementById('parent-card'),
             };
             const employeeGenderSelect = document.getElementById('gender');
             const maritalStatusSelect = document.getElementById('marital_status');
@@ -134,38 +239,68 @@
                     .catch(() => {});
             }
 
+            function spouseSectionAllowed() {
+                return ['married', 'polygamous'].includes(maritalStatusSelect.value);
+            }
+
+            function childSectionAllowed() {
+                return maritalStatusSelect.value !== 'single';
+            }
+
             function spouseLimit() {
                 return employeeGenderSelect.value === 'male' && maritalStatusSelect.value === 'polygamous' ? 4 : 1;
             }
 
-            function setLimitMessage(type, message, isWarning = false) {
+            function setLimitMessage(type, message, tone = 'info') {
                 const messageEl = document.querySelector(`.dependent-limit-message[data-type="${type}"]`);
                 if (!messageEl) return;
 
                 messageEl.textContent = message;
-                messageEl.className = `small mb-0 dependent-limit-message ${message ? (isWarning ? 'text-warning' : 'text-muted') : ''}`;
+                messageEl.classList.toggle('is-visible', Boolean(message));
+                messageEl.classList.toggle('is-warning', tone === 'warning');
+                messageEl.classList.toggle('is-info', tone === 'info');
+            }
+
+            function toggleSectionNote(type, visible) {
+                const note = cards[type].querySelector(`.dependent-section-note[data-note-for="${type}"]`);
+                if (note) {
+                    note.classList.toggle('is-visible', visible);
+                }
             }
 
             function updateDependentLimits() {
                 const spouseButton = document.querySelector('.btn-add-dependent-row[data-type="spouse"]');
                 const parentButton = document.querySelector('.btn-add-dependent-row[data-type="parent"]');
+                const childButton = document.querySelector('.btn-add-dependent-row[data-type="child"]');
                 const spouseCount = rowsFor('spouse').length;
+                const childCount = rowsFor('child').length;
                 const parentCount = rowsFor('parent').length;
                 const maxSpouses = spouseLimit();
+                const spouseAllowed = spouseSectionAllowed();
+                const childAllowed = childSectionAllowed();
 
-                spouseButton.disabled = spouseCount >= maxSpouses;
-                if (spouseCount > maxSpouses) {
+                spouseButton.disabled = !spouseAllowed || spouseCount >= maxSpouses;
+                cards.spouse.classList.toggle('is-section-disabled', !spouseAllowed && spouseCount === 0);
+                toggleSectionNote('spouse', !spouseAllowed);
+
+                if (!spouseAllowed && spouseCount > 0) {
+                    setLimitMessage('spouse', 'الحالة الزوجية الحالية لا تسمح بوجود زوج/ة؛ الرجاء حذف السجلات الزائدة أو تعديل الحالة الزوجية.', 'warning');
+                } else if (spouseAllowed && spouseCount > maxSpouses) {
                     setLimitMessage('spouse', maxSpouses === 4
                         ? 'لا يمكن إضافة أكثر من 4 زوجات؛ الرجاء حذف الزوجات الزائدة قبل الإرسال.'
-                        : 'الحالة الزوجية الحالية تسمح بزوج/ة واحدة فقط؛ الرجاء حذف الزوجات الزائدة قبل الإرسال.', true);
-                } else if (spouseCount === maxSpouses) {
-                    setLimitMessage('spouse', maxSpouses === 4 ? 'تم الوصول للحد الأقصى (4 زوجات)' : 'تم الوصول للحد الأقصى (زوج/ة واحدة)');
+                        : 'الحالة الزوجية الحالية تسمح بزوج/ة واحدة فقط؛ الرجاء حذف الزوجات الزائدة قبل الإرسال.', 'warning');
+                } else if (spouseAllowed && spouseCount === maxSpouses) {
+                    setLimitMessage('spouse', maxSpouses === 4 ? 'تم الوصول للحد الأقصى (4 زوجات)' : 'تم الوصول للحد الأقصى (زوج/ة واحدة)', 'info');
                 } else {
                     setLimitMessage('spouse', '');
                 }
 
+                childButton.disabled = !childAllowed;
+                cards.child.classList.toggle('is-section-disabled', !childAllowed && childCount === 0);
+                toggleSectionNote('child', !childAllowed);
+
                 parentButton.disabled = parentCount >= 2;
-                setLimitMessage('parent', parentCount >= 2 ? 'تم الوصول للحد الأقصى (أب وأم)' : '');
+                setLimitMessage('parent', parentCount >= 2 ? 'تم الوصول للحد الأقصى (أب وأم)' : '', 'info');
             }
 
             function updateMaritalStatusAvailability() {
@@ -193,7 +328,7 @@
             function buildRow(type, values = {}) {
                 const index = dependentIndex++;
                 const row = document.createElement('div');
-                row.className = 'dependent-row border rounded p-3 mb-3 bg-light';
+                row.className = 'dependent-row';
                 row.dataset.index = index;
                 row.dataset.type = type;
 
@@ -229,8 +364,8 @@
                 ` : '';
 
                 row.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
-                        <span class="fw-semibold dependent-row-title"></span>
+                    <div class="dependent-row-header">
+                        <span class="dependent-row-title"></span>
                         <button type="button" class="btn btn-sm btn-outline-danger btn-remove-dependent-row" title="حذف">
                             <i class="fa-solid fa-trash"></i> حذف
                         </button>
