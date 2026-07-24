@@ -307,6 +307,12 @@ class EmployeeController extends Controller
         $parentTypes = [];
         $seenNationalIds = [$employee['national_id'] => true];
 
+        if ($employee['gender'] === 'female' && $employee['marital_status'] === 'polygamous') {
+            throw ValidationException::withMessages([
+                'marital_status' => 'لا يمكن اختيار "متعدد الزوجات" لموظفة أنثى.',
+            ]);
+        }
+
         foreach ($dependents as $index => $dependent) {
             if (isset($seenNationalIds[$dependent['national_id']])) {
                 throw ValidationException::withMessages([
@@ -343,9 +349,15 @@ class EmployeeController extends Controller
             }
         }
 
-        if ($spouseCount > 1 && $employee['marital_status'] !== 'polygamous') {
+        $maxSpouses = $employee['gender'] === 'male' && $employee['marital_status'] === 'polygamous' ? 4 : 1;
+
+        if ($spouseCount > $maxSpouses) {
+            $message = $maxSpouses === 4
+                ? 'لا يمكن إضافة أكثر من 4 زوجات.'
+                : 'لا يمكن إضافة أكثر من زوج/ة واحدة.';
+
             throw ValidationException::withMessages([
-                'dependents' => 'لا يمكن إضافة أكثر من زوج/ة واحدة إلا إذا كانت الحالة الزوجية متعدد الزوجات.',
+                'dependents' => $message,
             ]);
         }
     }

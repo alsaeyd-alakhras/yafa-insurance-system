@@ -37,6 +37,7 @@
             <div class="mb-4 col-md-6">
                 <x-form.select
                     name="marital_status"
+                    id="marital_status"
                     label="الحالة الزوجية"
                     :options="[
                         'single' => 'أعزب/عزباء',
@@ -48,6 +49,9 @@
                     :value="$employee->marital_status ?? 'single'"
                     required
                 />
+                <div id="marital_status_gender_hint" class="small mt-1 text-warning d-none">
+                    لا يمكن اختيار "متعدد الزوجات" لموظفة أنثى، تم تعديل الحالة الزوجية.
+                </div>
             </div>
             <div class="mb-4 col-md-6">
                 <x-form.select

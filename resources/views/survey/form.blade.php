@@ -52,6 +52,9 @@
                                     :value="old('marital_status', 'single')"
                                     required
                                 />
+                                <div id="marital_status_gender_hint" class="small mt-1 text-warning d-none">
+                                    لا يمكن اختيار "متعدد الزوجات" لموظفة أنثى، تم تعديل الحالة الزوجية.
+                                </div>
                             </div>
                             <div class="mb-4 col-md-6">
                                 <x-form.select
@@ -67,7 +70,7 @@
                 </div>
 
                 <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
                         <h6 class="mb-0">الزوجات/الزوج</h6>
                         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="spouse">
                             <i class="fa-solid fa-plus"></i> إضافة زوج/ة
@@ -76,11 +79,12 @@
                     <div class="card-body">
                         <div id="spouse-rows" class="dependent-section" data-type="spouse"></div>
                         <p class="text-muted small mb-0 empty-dependent-message">لا يوجد زوج/ة مضافون بعد.</p>
+                        <p class="small mb-0 dependent-limit-message" data-type="spouse" aria-live="polite"></p>
                     </div>
                 </div>
 
                 <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
                         <h6 class="mb-0">الأبناء</h6>
                         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="child">
                             <i class="fa-solid fa-plus"></i> إضافة ابن/ة
@@ -93,7 +97,7 @@
                 </div>
 
                 <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
                         <h6 class="mb-0">الآباء</h6>
                         <button type="button" class="btn btn-sm btn-primary btn-add-dependent-row" data-type="parent">
                             <i class="fa-solid fa-plus"></i> إضافة أب/أم
@@ -102,6 +106,7 @@
                     <div class="card-body">
                         <div id="parent-rows" class="dependent-section" data-type="parent"></div>
                         <p class="text-muted small mb-0 empty-dependent-message">لا يوجد آباء مضافون بعد.</p>
+                        <p class="small mb-0 dependent-limit-message" data-type="parent" aria-live="polite"></p>
                     </div>
                 </div>
 
@@ -123,6 +128,8 @@
                     parent: document.getElementById('parent-rows'),
                 };
                 const employeeGenderSelect = document.getElementById('gender');
+                const maritalStatusSelect = document.getElementById('marital_status');
+                const maritalStatusHint = document.getElementById('marital_status_gender_hint');
 
                 function escapeAttribute(value) {
                     return String(value || '')
@@ -144,11 +151,86 @@
                     return '';
                 }
 
+                function rowsFor(type) {
+                    return Array.from(sections[type].children).filter(function (row) {
+                        return row.classList.contains('dependent-row');
+                    });
+                }
+
                 function updateEmptyMessages() {
                     Object.values(sections).forEach(function (section) {
                         const message = section.parentElement.querySelector('.empty-dependent-message');
-                        message.style.display = section.children.length ? 'none' : 'block';
+                        message.style.display = rowsFor(section.dataset.type).length ? 'none' : 'block';
                     });
+                }
+
+                function rowTitle(type) {
+                    if (type === 'spouse') return 'زوج/ة';
+                    if (type === 'child') return 'ابن/ة';
+                    return 'والد/والدة';
+                }
+
+                function updateRowNumbers(type) {
+                    rowsFor(type).forEach(function (row, position) {
+                        const title = row.querySelector('.dependent-row-title');
+                        if (title) {
+                            title.textContent = `${rowTitle(type)} #${position + 1}`;
+                        }
+                    });
+                }
+
+                function updateAllRowNumbers() {
+                    Object.keys(sections).forEach(updateRowNumbers);
+                }
+
+                function spouseLimit() {
+                    return employeeGenderSelect.value === 'male' && maritalStatusSelect.value === 'polygamous' ? 4 : 1;
+                }
+
+                function setLimitMessage(type, message, isWarning = false) {
+                    const messageEl = document.querySelector(`.dependent-limit-message[data-type="${type}"]`);
+                    if (!messageEl) return;
+
+                    messageEl.textContent = message;
+                    messageEl.className = `small mb-0 dependent-limit-message ${message ? (isWarning ? 'text-warning' : 'text-muted') : ''}`;
+                }
+
+                function updateDependentLimits() {
+                    const spouseButton = document.querySelector('.btn-add-dependent-row[data-type="spouse"]');
+                    const parentButton = document.querySelector('.btn-add-dependent-row[data-type="parent"]');
+                    const spouseCount = rowsFor('spouse').length;
+                    const parentCount = rowsFor('parent').length;
+                    const maxSpouses = spouseLimit();
+
+                    spouseButton.disabled = spouseCount >= maxSpouses;
+                    if (spouseCount > maxSpouses) {
+                        setLimitMessage('spouse', maxSpouses === 4
+                            ? 'لا يمكن إضافة أكثر من 4 زوجات؛ الرجاء حذف الزوجات الزائدة قبل الإرسال.'
+                            : 'الحالة الزوجية الحالية تسمح بزوج/ة واحدة فقط؛ الرجاء حذف الزوجات الزائدة قبل الإرسال.', true);
+                    } else if (spouseCount === maxSpouses) {
+                        setLimitMessage('spouse', maxSpouses === 4 ? 'تم الوصول للحد الأقصى (4 زوجات)' : 'تم الوصول للحد الأقصى (زوج/ة واحدة)');
+                    } else {
+                        setLimitMessage('spouse', '');
+                    }
+
+                    parentButton.disabled = parentCount >= 2;
+                    setLimitMessage('parent', parentCount >= 2 ? 'تم الوصول للحد الأقصى (أب وأم)' : '');
+                }
+
+                function updateMaritalStatusAvailability() {
+                    const polygamousOption = maritalStatusSelect.querySelector('option[value="polygamous"]');
+                    if (!polygamousOption) return;
+
+                    const isFemale = employeeGenderSelect.value === 'female';
+                    polygamousOption.disabled = isFemale;
+                    polygamousOption.hidden = isFemale;
+
+                    if (isFemale && maritalStatusSelect.value === 'polygamous') {
+                        maritalStatusSelect.value = 'married';
+                        maritalStatusHint?.classList.remove('d-none');
+                    } else {
+                        maritalStatusHint?.classList.add('d-none');
+                    }
                 }
 
                 function syncSpouseGenders() {
@@ -160,7 +242,7 @@
                 function addDependentRow(type, values = {}) {
                     const index = dependentIndex++;
                     const row = document.createElement('div');
-                    row.className = 'row align-items-end border-top pt-3 mt-3 dependent-row';
+                    row.className = 'dependent-row border rounded p-3 mb-3 bg-light';
                     row.dataset.index = index;
                     row.dataset.type = type;
 
@@ -173,7 +255,7 @@
                     let genderField = `<input type="hidden" name="dependents[${index}][gender]" value="${hiddenGender}">`;
                     if (type === 'child') {
                         genderField = `
-                            <div class="col-md-2 mb-3">
+                            <div class="col-md-3">
                                 <label class="form-label">الجنس</label>
                                 <select class="form-select" name="dependents[${index}][gender]" required>
                                     <option value="">إختر القيمة</option>
@@ -185,7 +267,7 @@
                     }
 
                     const parentTypeField = type === 'parent' ? `
-                        <div class="col-md-2 mb-3">
+                        <div class="col-md-3">
                             <label class="form-label">نوع الوالد</label>
                             <select class="form-select parent-type-select" name="dependents[${index}][parent_type]" required>
                                 <option value="">إختر القيمة</option>
@@ -196,38 +278,54 @@
                     ` : '';
 
                     row.innerHTML = `
-                        <input type="hidden" name="dependents[${index}][type]" value="${type}">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">الاسم</label>
-                            <input type="text" class="form-control" name="dependents[${index}][full_name]" value="${fullName}" required>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">رقم الهوية</label>
-                            <input type="text" class="form-control dependent-national-id" maxlength="9" name="dependents[${index}][national_id]" value="${nationalId}" required>
-                            <div class="small mt-1 dependent-national-id-feedback"></div>
-                        </div>
-                        ${genderField}
-                        ${parentTypeField}
-                        <div class="col-md-1 mb-3">
-                            <button type="button" class="btn btn-outline-danger btn-remove-dependent-row w-100" title="حذف">
-                                <i class="fa-solid fa-trash"></i>
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+                            <span class="fw-semibold dependent-row-title"></span>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-dependent-row" title="حذف">
+                                <i class="fa-solid fa-trash"></i> حذف
                             </button>
+                        </div>
+                        <input type="hidden" name="dependents[${index}][type]" value="${type}">
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <label class="form-label">الاسم</label>
+                                <input type="text" class="form-control" name="dependents[${index}][full_name]" value="${fullName}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">رقم الهوية</label>
+                                <input type="text" class="form-control dependent-national-id" maxlength="9" name="dependents[${index}][national_id]" value="${nationalId}" required>
+                                <div class="small mt-1 dependent-national-id-feedback"></div>
+                            </div>
+                            ${genderField}
+                            ${parentTypeField}
                         </div>
                     `;
 
                     sections[type].appendChild(row);
                     updateEmptyMessages();
+                    updateRowNumbers(type);
+                    updateDependentLimits();
                 }
 
                 document.querySelectorAll('.btn-add-dependent-row').forEach(function (button) {
                     button.addEventListener('click', function () {
+                        updateDependentLimits();
+                        if (button.disabled) return;
+
                         addDependentRow(button.dataset.type);
                     });
                 });
 
                 document.addEventListener('change', function (event) {
                     if (event.target === employeeGenderSelect) {
+                        updateMaritalStatusAvailability();
                         syncSpouseGenders();
+                        updateDependentLimits();
+                        return;
+                    }
+
+                    if (event.target === maritalStatusSelect) {
+                        updateMaritalStatusAvailability();
+                        updateDependentLimits();
                         return;
                     }
 
@@ -239,8 +337,12 @@
 
                 document.addEventListener('click', function (event) {
                     if (event.target.closest('.btn-remove-dependent-row')) {
-                        event.target.closest('.dependent-row').remove();
+                        const row = event.target.closest('.dependent-row');
+                        const type = row.dataset.type;
+                        row.remove();
                         updateEmptyMessages();
+                        updateRowNumbers(type);
+                        updateDependentLimits();
                     }
                 });
 
@@ -284,7 +386,10 @@
                 });
 
                 updateEmptyMessages();
+                updateAllRowNumbers();
+                updateMaritalStatusAvailability();
                 syncSpouseGenders();
+                updateDependentLimits();
             });
         </script>
     @endpush

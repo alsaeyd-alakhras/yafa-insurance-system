@@ -114,9 +114,13 @@ class DependentController extends Controller
                 abort(422, 'جنس الزوج/ة يجب أن يخالف جنس الموظف.');
             }
 
-            $isPolygamous = $employee->marital_status === 'polygamous';
-            if (! $isPolygamous && $existingQuery->exists()) {
-                abort(422, 'لا يمكن إضافة أكثر من زوج/ة واحدة إلا إذا كانت الحالة الزوجية متعدد الزوجات.');
+            $maxSpouses = $employee->gender === 'male' && $employee->marital_status === 'polygamous' ? 4 : 1;
+            $spouseCountAfterSave = $existingQuery->count() + 1;
+
+            if ($spouseCountAfterSave > $maxSpouses) {
+                abort(422, $maxSpouses === 4
+                    ? 'لا يمكن إضافة أكثر من 4 زوجات.'
+                    : 'لا يمكن إضافة أكثر من زوج/ة واحدة.');
             }
         }
 
