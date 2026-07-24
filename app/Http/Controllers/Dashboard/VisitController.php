@@ -20,21 +20,30 @@ use Yajra\DataTables\Facades\DataTables;
 class VisitController extends Controller
 {
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['clinic_name'];
+    private const FILTERABLE_COLUMNS = ['patient_name', 'employee_name', 'clinic_name'];
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Visit::class);
 
         if ($request->ajax()) {
-            $query = Visit::query()->with(['patientEmployee', 'patientDependent', 'clinic', 'employee']);
-            $this->applyColumnFilters($query, $request);
+            $query = Visit::query()->with(['patientEmployee', 'patientDependent', 'clinic', 'employee', 'recordedBy', 'visitDepartments']);
+            $hasDateFilter = $this->applyColumnFilters($query, $request);
+
+            if (! $hasDateFilter) {
+                $query->whereDate('visit_date', now()->toDateString());
+            }
+
             $this->applySort($query, $request);
 
             return DataTables::of($query)
                 ->addColumn('patient_name', fn (Visit $visit) => $visit->patientEmployee?->full_name ?? $visit->patientDependent?->full_name ?? '-')
                 ->addColumn('employee_name', fn (Visit $visit) => $visit->employee?->full_name ?? '-')
                 ->addColumn('clinic_name', fn (Visit $visit) => $visit->clinic?->name ?? '-')
+                ->addColumn('departments_list', fn (Visit $visit) => $visit->visitDepartments->pluck('medicalDepartment.name')->filter()->implode('، ') ?: '-')
+                ->addColumn('total_before_discount', fn (Visit $visit) => $visit->total_before_discount !== null ? number_format((float) $visit->total_before_discount, 2) : '-')
+                ->addColumn('total_after_discount', fn (Visit $visit) => $visit->total_after_discount !== null ? number_format((float) $visit->total_after_discount, 2) : '-')
+                ->addColumn('recorded_by_name', fn (Visit $visit) => $visit->recordedBy?->name ?? '-')
                 ->addColumn('edit', fn (Visit $visit) => $visit->id)
                 ->addColumn('delete', fn (Visit $visit) => auth()->user()->can('delete', $visit) ? $visit->id : null)
                 ->rawColumns(['edit', 'delete'])
@@ -44,17 +53,20 @@ class VisitController extends Controller
         return view('dashboard.visits.index');
     }
 
-    private function applyColumnFilters($query, Request $request): void
+    private function applyColumnFilters($query, Request $request): bool
     {
         $filters = (array) $request->input('column_filters', []);
+        $hasDateFilter = false;
 
         foreach ($filters as $column => $values) {
             if ($column === 'visit_date' && is_array($values)) {
                 if (! empty($values['from'])) {
                     $query->whereDate('visit_date', '>=', $values['from']);
+                    $hasDateFilter = true;
                 }
                 if (! empty($values['to'])) {
                     $query->whereDate('visit_date', '<=', $values['to']);
+                    $hasDateFilter = true;
                 }
                 continue;
             }
@@ -66,7 +78,20 @@ class VisitController extends Controller
             if ($column === 'clinic_name') {
                 $query->whereHas('clinic', fn ($q) => $q->whereIn('name', (array) $values));
             }
+
+            if ($column === 'patient_name') {
+                $query->where(function ($q) use ($values) {
+                    $q->whereHas('patientEmployee', fn ($qq) => $qq->whereIn('full_name', (array) $values))
+                        ->orWhereHas('patientDependent', fn ($qq) => $qq->whereIn('full_name', (array) $values));
+                });
+            }
+
+            if ($column === 'employee_name') {
+                $query->whereHas('employee', fn ($q) => $q->whereIn('full_name', (array) $values));
+            }
         }
+
+        return $hasDateFilter;
     }
 
     private function applySort($query, Request $request): void
@@ -87,12 +112,53 @@ class VisitController extends Controller
 
         abort_unless(in_array($column, self::FILTERABLE_COLUMNS, true), 404);
 
-        $values = Clinic::query()
-            ->whereHas('visits')
-            ->distinct()
-            ->pluck('name');
+        $values = match ($column) {
+            'clinic_name' => Clinic::query()->whereHas('visits')->distinct()->pluck('name'),
+            'patient_name' => Employee::query()->whereHas('visitsAsPatient')->pluck('full_name')
+                ->merge(Dependent::query()->whereHas('visitsAsPatient')->pluck('full_name'))
+                ->unique()
+                ->values(),
+            'employee_name' => Employee::query()->whereHas('visits')->distinct()->pluck('full_name'),
+            default => collect(),
+        };
 
         return response()->json($values);
+    }
+
+    public function searchPatients(Request $request): JsonResponse
+    {
+        $this->authorize('create', Visit::class);
+
+        $term = trim((string) $request->input('term', ''));
+
+        if (mb_strlen($term) < 2) {
+            return response()->json([]);
+        }
+
+        $employees = Employee::query()
+            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")->orWhere('national_id', 'like', "%{$term}%"))
+            ->limit(10)
+            ->get()
+            ->map(fn (Employee $employee) => [
+                'type' => 'employee',
+                'national_id' => $employee->national_id,
+                'full_name' => $employee->full_name,
+                'label' => "{$employee->full_name} — {$employee->national_id} (موظف)",
+            ]);
+
+        $dependents = Dependent::query()
+            ->with('employee')
+            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")->orWhere('national_id', 'like', "%{$term}%"))
+            ->limit(10)
+            ->get()
+            ->map(fn (Dependent $dependent) => [
+                'type' => 'dependent',
+                'national_id' => $dependent->national_id,
+                'full_name' => $dependent->full_name,
+                'label' => "{$dependent->full_name} — {$dependent->national_id} (تابع لـ: {$dependent->employee?->full_name})",
+            ]);
+
+        return response()->json($employees->concat($dependents)->take(15)->values());
     }
 
     public function search(Request $request): JsonResponse

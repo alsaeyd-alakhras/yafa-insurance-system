@@ -24,9 +24,6 @@
                 @can('view', 'App\Models\User')
                     <a href="{{ route('dashboard.users.index') }}" class="btn btn-outline-primary btn-sm">المستخدمون</a>
                 @endcan
-                @can('view', 'App\Models\Constant')
-                    <a href="{{ route('dashboard.constants.index') }}" class="btn btn-outline-primary btn-sm">ثوابت النظام</a>
-                @endcan
             </div>
         </div>
     @endif

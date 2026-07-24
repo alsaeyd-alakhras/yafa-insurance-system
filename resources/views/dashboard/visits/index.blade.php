@@ -26,45 +26,19 @@
                 width: var(--sticky-col2-width);
                 min-width: var(--sticky-col2-width);
             }
+
+            #patient-search-results .list-group-item { cursor: pointer; }
         </style>
     @endpush
 
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0">تسجيل زيارة جديدة</h5>
-        </div>
-        <div class="card-body">
-            <div class="row align-items-end">
-                <div class="col-md-4 mb-3">
-                    <label class="form-label" for="search-national-id">رقم الهوية</label>
-                    <input type="text" class="form-control" id="search-national-id" maxlength="9" placeholder="رقم الهوية">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label class="form-label" for="search-clinic-id">العيادة (اختياري — للكشف الطبي فقط)</label>
-                    <select class="form-select" id="search-clinic-id">
-                        <option value="">بدون عيادة</option>
-                        @foreach (\App\Models\Clinic::where('is_active', true)->orderBy('name')->get() as $clinic)
-                            <option value="{{ $clinic->id }}">{{ $clinic->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <button type="button" class="btn btn-primary w-100" id="btn-search-visit">
-                        <i class="fa-solid fa-magnifying-glass me-1"></i> بحث
-                    </button>
-                </div>
-            </div>
-            <div id="search-result" class="mt-2"></div>
-        </div>
-    </div>
-
-    <form id="create-visit-form" action="{{ route('dashboard.visits.store') }}" method="post" class="d-none">
-        @csrf
-        <input type="hidden" name="national_id" id="create-visit-national-id">
-        <input type="hidden" name="clinic_id" id="create-visit-clinic-id">
-    </form>
-
     <x-slot:extra_nav>
+        @can('create', 'App\\Models\\Visit')
+            <div class="mx-2 nav-item">
+                <button type="button" class="m-0 text-white btn btn-primary" id="btn-open-new-visit">
+                    <i class="fa-solid fa-plus fe-16"></i> تسجيل زيارة جديدة
+                </button>
+            </div>
+        @endcan
         <div class="nav-item">
             <select class="form-control" name="advanced-pagination" id="advanced-pagination">
                 <option value="50">50</option>
@@ -86,15 +60,24 @@
         </div>
     </x-slot:extra_nav>
 
+    <p class="text-muted mb-3">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        الجدول يعرض زيارات اليوم افتراضياً — استخدم فلتر التاريخ بعمود "التاريخ" لعرض زيارات تواريخ أخرى.
+    </p>
+
     @php
         $fields = [
             'edit' => 'تعديل',
+            'visit_date' => 'التاريخ',
             'patient_name' => 'المريض',
             'employee_name' => 'الموظف صاحب الرصيد',
             'clinic_name' => 'العيادة',
-            'visit_date' => 'التاريخ',
+            'departments_list' => 'الأقسام',
+            'total_before_discount' => 'المبلغ قبل الخصم',
+            'total_after_discount' => 'المبلغ بعد الخصم',
+            'recorded_by_name' => 'مسجّل الزيارة',
         ];
-        $filterableFields = ['clinic_name'];
+        $filterableFields = ['patient_name', 'employee_name', 'clinic_name'];
         $sortableFields = ['visit_date'];
     @endphp
 
@@ -190,6 +173,51 @@
         </div>
     </div>
 
+    {{-- Modal: تسجيل زيارة جديدة --}}
+    <div class="modal fade" id="newVisitModal" tabindex="-1" aria-labelledby="newVisitModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newVisitModalLabel">تسجيل زيارة جديدة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="patient-search-input">ابحث بالاسم أو رقم الهوية</label>
+                        <input type="text" class="form-control" id="patient-search-input" placeholder="اكتب اسم المريض أو رقم هويته...">
+                    </div>
+                    <div id="patient-search-results" class="list-group mb-3"></div>
+
+                    <div id="selected-patient-panel" class="d-none">
+                        <div class="alert alert-secondary d-flex justify-content-between align-items-center">
+                            <span>المريض المختار: <strong id="selected-patient-name"></strong></span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-change-patient">تغيير</button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="new-visit-clinic-id">العيادة (اختياري — للكشف الطبي فقط)</label>
+                            <select class="form-select" id="new-visit-clinic-id">
+                                <option value="">بدون عيادة</option>
+                                @foreach (\App\Models\Clinic::where('is_active', true)->orderBy('name')->get() as $clinic)
+                                    <option value="{{ $clinic->id }}">{{ $clinic->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-check-quota">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i> فحص الرصيد
+                        </button>
+                        <div id="quota-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form id="create-visit-form" action="{{ route('dashboard.visits.store') }}" method="post" class="d-none">
+        @csrf
+        <input type="hidden" name="national_id" id="create-visit-national-id">
+        <input type="hidden" name="clinic_id" id="create-visit-clinic-id">
+    </form>
+
     <x-confirm-modal />
 
     @push('scripts')
@@ -207,7 +235,7 @@
             const urlEdit = `{{ route('dashboard.visits.edit', ':id') }}`;
             const urlDelete = `{{ route('dashboard.visits.destroy', ':id') }}`;
 
-            const fields = ['#', 'edit', 'patient_name', 'employee_name', 'clinic_name', 'visit_date', 'delete'];
+            const fields = ['#', 'edit', 'visit_date', 'patient_name', 'employee_name', 'clinic_name', 'departments_list', 'total_before_discount', 'total_after_discount', 'recorded_by_name', 'delete'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
@@ -217,10 +245,14 @@
                         return `<a href="${urlEdit.replace(':id', data)}" class="action-btn btn-edit" title="تعديل"><i class="fas fa-edit"></i></a>`;
                     },
                 },
+                { data: 'visit_date', name: 'visit_date', orderable: false, class: 'text-center' },
                 { data: 'patient_name', name: 'patient_name', orderable: false },
                 { data: 'employee_name', name: 'employee_name', orderable: false },
                 { data: 'clinic_name', name: 'clinic_name', orderable: false },
-                { data: 'visit_date', name: 'visit_date', orderable: false, class: 'text-center' },
+                { data: 'departments_list', name: 'departments_list', orderable: false },
+                { data: 'total_before_discount', name: 'total_before_discount', orderable: false, class: 'text-center' },
+                { data: 'total_after_discount', name: 'total_after_discount', orderable: false, class: 'text-center' },
+                { data: 'recorded_by_name', name: 'recorded_by_name', orderable: false },
                 {
                     data: 'delete', name: 'delete', orderable: false, searchable: false,
                     render: function (data) {
@@ -237,24 +269,82 @@
         </script>
         <script type="text/javascript" src="{{ asset('js/datatable.js') }}"></script>
         <script>
-            $(document).on('click', '#btn-search-visit', function () {
-                const nationalId = $('#search-national-id').val().trim();
-                const clinicId = $('#search-clinic-id').val();
-                const $result = $('#search-result');
-                $result.empty();
+            let selectedPatient = null;
+            let patientSearchTimer = null;
 
-                if (!nationalId) {
-                    toastr.warning('الرجاء إدخال رقم الهوية');
+            function resetNewVisitModal() {
+                selectedPatient = null;
+                $('#patient-search-input').val('');
+                $('#patient-search-results').empty();
+                $('#selected-patient-panel').addClass('d-none');
+                $('#quota-result').empty();
+                $('#new-visit-clinic-id').val('');
+            }
+
+            $(document).on('click', '#btn-open-new-visit', function () {
+                resetNewVisitModal();
+                $('#newVisitModal').modal('show');
+                setTimeout(() => $('#patient-search-input').trigger('focus'), 300);
+            });
+
+            $(document).on('input', '#patient-search-input', function () {
+                const term = $(this).val().trim();
+                clearTimeout(patientSearchTimer);
+                const $results = $('#patient-search-results');
+
+                if (term.length < 2) {
+                    $results.empty();
                     return;
                 }
+
+                patientSearchTimer = setTimeout(function () {
+                    $.ajax({
+                        url: '{{ route('dashboard.visits.search-patients') }}',
+                        method: 'GET',
+                        data: { term: term },
+                        success: function (response) {
+                            $results.empty();
+                            if (!response.length) {
+                                $results.html('<div class="list-group-item text-muted">لا توجد نتائج</div>');
+                                return;
+                            }
+                            response.forEach(function (item) {
+                                const $item = $('<button type="button" class="list-group-item list-group-item-action"></button>')
+                                    .text(item.label)
+                                    .on('click', function () {
+                                        selectedPatient = item;
+                                        $('#selected-patient-name').text(item.label);
+                                        $('#selected-patient-panel').removeClass('d-none');
+                                        $('#patient-search-results').empty();
+                                        $('#patient-search-input').val('');
+                                        $('#quota-result').empty();
+                                    });
+                                $results.append($item);
+                            });
+                        },
+                    });
+                }, 300);
+            });
+
+            $(document).on('click', '#btn-change-patient', function () {
+                resetNewVisitModal();
+                $('#patient-search-input').trigger('focus');
+            });
+
+            $(document).on('click', '#btn-check-quota', function () {
+                if (!selectedPatient) return;
+
+                const clinicId = $('#new-visit-clinic-id').val();
+                const $result = $('#quota-result');
+                $result.empty();
 
                 $.ajax({
                     url: '{{ route('dashboard.visits.search') }}',
                     method: 'GET',
-                    data: { national_id: nationalId, clinic_id: clinicId },
+                    data: { national_id: selectedPatient.national_id, clinic_id: clinicId },
                     success: function (response) {
                         if (response.redirect) {
-                            $result.html('<div class="alert alert-info">توجد زيارة مسجّلة لهذا المريض اليوم — جارِ التوجيه...</div>');
+                            $result.html('<div class="alert alert-info">توجد زيارة مسجّلة لهذا المريض اليوم لهذه العيادة — جارِ التوجيه...</div>');
                             window.location.href = response.redirect;
                             return;
                         }
@@ -262,7 +352,6 @@
                         const quotaColor = response.remaining_quota > 0 ? 'success' : 'danger';
                         $result.html(`
                             <div class="alert alert-${quotaColor}">
-                                المريض: <strong>${response.patient_name}</strong> —
                                 الرصيد المتبقي هذا الشهر: <strong>${response.remaining_quota} / 2</strong>
                                 ${response.remaining_quota > 0 ? '<button type="button" class="btn btn-sm btn-primary ms-3" id="btn-create-visit">تسجيل الزيارة</button>' : ''}
                             </div>
@@ -276,8 +365,9 @@
             });
 
             $(document).on('click', '#btn-create-visit', function () {
-                $('#create-visit-national-id').val($('#search-national-id').val().trim());
-                $('#create-visit-clinic-id').val($('#search-clinic-id').val());
+                if (!selectedPatient) return;
+                $('#create-visit-national-id').val(selectedPatient.national_id);
+                $('#create-visit-clinic-id').val($('#new-visit-clinic-id').val());
                 $('#create-visit-form').trigger('submit');
             });
         </script>

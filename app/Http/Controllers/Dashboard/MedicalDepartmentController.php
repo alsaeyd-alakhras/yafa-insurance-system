@@ -32,6 +32,30 @@ class MedicalDepartmentController extends Controller
         ]);
     }
 
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('create', MedicalDepartment::class);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'discount_percentage' => 'required|numeric|min:0|max:100',
+            'max_discount_amount' => 'nullable|numeric|min:0',
+        ]);
+        $validated['is_active'] = true;
+
+        $medicalDepartment = MedicalDepartment::create($validated);
+
+        ActivityLogService::log(
+            'Created',
+            'MedicalDepartment',
+            "تم إضافة قسم طبي جديد: {$medicalDepartment->name}.",
+            null,
+            $medicalDepartment->toArray()
+        );
+
+        return redirect()->route('dashboard.medical-departments.index')->with('success', 'تم إضافة القسم الطبي.');
+    }
+
     public function update(Request $request, MedicalDepartment $medicalDepartment): RedirectResponse
     {
         $this->authorize('update', $medicalDepartment);

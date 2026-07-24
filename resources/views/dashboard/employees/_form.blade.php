@@ -8,6 +8,8 @@
     </div>
 @endif
 
+@php $showSubmit = $showSubmit ?? true; @endphp
+
 <div class="card">
     <div class="card-header">
         <h5 class="mb-0">بيانات الموظف</h5>
@@ -19,6 +21,9 @@
             </div>
             <div class="mb-4 col-md-6">
                 <x-form.input name="national_id" label="رقم الهوية" maxlength="9" :value="$employee->national_id ?? ''" required />
+                @unless ($isEdit)
+                    <div id="national_id_feedback" class="small mt-1"></div>
+                @endunless
             </div>
             <div class="mb-4 col-md-6">
                 <x-form.select
@@ -65,8 +70,10 @@
                 </div>
             @endif
         </div>
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary">{{ $isEdit ? 'حفظ التعديلات' : 'إضافة الموظف' }}</button>
-        </div>
+        @if ($showSubmit)
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">{{ $isEdit ? 'حفظ التعديلات' : 'إضافة الموظف' }}</button>
+            </div>
+        @endif
     </div>
 </div>

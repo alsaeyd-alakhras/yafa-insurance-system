@@ -59,7 +59,7 @@
 
     @php
         $fields = [
-            'edit' => 'تعديل',
+            'edit' => 'إجراءات',
             'full_name' => 'الاسم',
             'national_id' => 'رقم الهوية',
             'gender' => 'الجنس',
@@ -146,9 +146,11 @@
 
             const urlIndex = `{{ route('dashboard.employees.index') }}`;
             const urlFilters = `{{ route('dashboard.employees.filters', ':column') }}`;
+            const urlShow = `{{ route('dashboard.employees.show', ':id') }}`;
             const urlEdit = `{{ route('dashboard.employees.edit', ':id') }}`;
             const urlDelete = `{{ route('dashboard.employees.destroy', ':id') }}`;
 
+            const abilityView = {{ Auth::user()->can('view', 'App\\Models\\Employee') ? 'true' : 'false' }};
             const abilityEdit = {{ Auth::user()->can('update', 'App\\Models\\Employee') ? 'true' : 'false' }};
             const abilityDelete = {{ Auth::user()->can('delete', 'App\\Models\\Employee') ? 'true' : 'false' }};
 
@@ -172,8 +174,14 @@
                     orderable: false,
                     searchable: false,
                     render: function (data) {
-                        if (!abilityEdit) return '';
-                        return `<a href="${urlEdit.replace(':id', data)}" class="action-btn btn-edit" title="تعديل"><i class="fas fa-edit"></i></a>`;
+                        const buttons = [];
+                        if (abilityView) {
+                            buttons.push(`<a href="${urlShow.replace(':id', data)}" class="action-btn btn-view" title="عرض"><i class="fas fa-eye"></i></a>`);
+                        }
+                        if (abilityEdit) {
+                            buttons.push(`<a href="${urlEdit.replace(':id', data)}" class="action-btn btn-edit" title="تعديل"><i class="fas fa-edit"></i></a>`);
+                        }
+                        return buttons.join(' ');
                     },
                 },
                 { data: 'full_name', name: 'full_name', orderable: false },
@@ -211,3 +219,4 @@
         <script type="text/javascript" src="{{ asset('js/datatable.js') }}"></script>
     @endpush
 </x-front-layout>
+

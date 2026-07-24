@@ -15,12 +15,6 @@ return [
     //     'update' => 'تعديل',
     //     'delete' => 'حذف',
     // ],
-    'constants' => [
-        'name' => 'ثوابت النظام',
-        'view' => 'عرض',
-        'create' => 'اضافة',
-        'update' => 'تعديل',
-    ],
     'activitylogs' => [
         'name' => 'العمليات',
         'view' => 'عرض',
@@ -35,6 +29,7 @@ return [
     'medical_departments' => [
         'name' => 'الأقسام الطبية',
         'view' => 'عرض',
+        'create' => 'اضافة',
         'update' => 'تعديل',
     ],
     'clinics' => [

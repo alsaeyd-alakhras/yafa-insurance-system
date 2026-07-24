@@ -31,8 +31,9 @@
             @if (
                 auth()->user()?->can('view', 'App\Models\OrganizationUnit')
                 || auth()->user()?->can('view', 'App\Models\MedicalDepartment')
+                || auth()->user()?->can('view', 'App\Models\Clinic')
             )
-            <li class="menu-item {{ request()->is('organization-units*') || request()->is('medical-departments*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->is('organization-units*') || request()->is('medical-departments*') || request()->is('clinics*') ? 'active open' : '' }}">
                 <a href="javascript:void(0)" class="menu-link menu-toggle">
                     <i class="fa-solid fa-database me-2"></i>
                     <div data-i18n="foundation">البيانات الأساسية</div>
@@ -54,6 +55,14 @@
                         </a>
                     </li>
                     @endcan
+                    @can('view', 'App\Models\Clinic')
+                    <li class="menu-item {{ request()->is('clinics*') ? 'active' : '' }}">
+                        <a href="{{ route('dashboard.clinics.index') }}" class="menu-link">
+                            <i class="fa-solid fa-stethoscope me-2"></i>
+                            <div data-i18n="clinics">العيادات</div>
+                        </a>
+                    </li>
+                    @endcan
                 </ul>
             </li>
             @endif
@@ -68,32 +77,22 @@
             </li>
             @endcan
 
-            {{-- إدارة المستخدمين --}}
-            @can('view', 'App\Models\User')
-            <li class="menu-item {{ request()->is('users*') ? 'active' : '' }}">
-                <a href="{{ route('dashboard.users.index') }}" class="menu-link">
-                    <i class="fa-solid fa-user-gear me-2"></i>
-                    <div data-i18n="users">إدارة المستخدمين</div>
-                </a>
-            </li>
-            @endcan
-
             {{-- الإعدادات --}}
             @if (
-                auth()->user()?->can('view', 'App\Models\Constant')
+                auth()->user()?->can('view', 'App\Models\User')
                 || auth()->user()?->can('view', 'App\Models\ActivityLog')
             )
-            <li class="menu-item {{ request()->is('constants*') || request()->is('logs*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->is('users*') || request()->is('logs*') ? 'active open' : '' }}">
                 <a href="javascript:void(0)" class="menu-link menu-toggle">
                     <i class="fa-solid fa-gear me-2"></i>
                     <div data-i18n="settings">الإعدادات</div>
                 </a>
                 <ul class="menu-sub">
-                    @can('view', 'App\Models\Constant')
-                    <li class="menu-item {{ request()->is('constants*') ? 'active' : '' }}">
-                        <a href="{{ route('dashboard.constants.index') }}" class="menu-link">
-                            <i class="fa-solid fa-sliders me-2"></i>
-                            <div data-i18n="constants">ثوابت النظام</div>
+                    @can('view', 'App\Models\User')
+                    <li class="menu-item {{ request()->is('users*') ? 'active' : '' }}">
+                        <a href="{{ route('dashboard.users.index') }}" class="menu-link">
+                            <i class="fa-solid fa-user-gear me-2"></i>
+                            <div data-i18n="users">إدارة المستخدمين</div>
                         </a>
                     </li>
                     @endcan

@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\OrganizationUnit;
+use App\Models\SurveySubmission;
 use App\Rules\UniqueNationalId;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -123,15 +126,42 @@ class EmployeeController extends Controller
         return view('dashboard.employees.create', compact('organizationUnits'));
     }
 
+    public function show(Employee $employee): View
+    {
+        $this->authorize('view', $employee);
+
+        $employee->load(['organizationUnit', 'dependents']);
+
+        return view('dashboard.employees.show', compact('employee'));
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', Employee::class);
 
         $validated = $this->validateEmployee($request);
+        $dependents = $validated['dependents'] ?? [];
+        unset($validated['dependents']);
+
+        $this->assertCreateDependentsRules($validated, $dependents);
+        $this->assertCreateNationalIdsAvailable($validated, $dependents);
+
         $validated['source'] = 'admin';
         $validated['status'] = $validated['status'] ?? 'active';
 
-        $employee = Employee::create($validated);
+        $employee = DB::transaction(function () use ($validated, $dependents) {
+            $employee = Employee::create($validated);
+
+            foreach ($dependents as $dependent) {
+                if ($dependent['type'] !== 'parent') {
+                    $dependent['parent_type'] = null;
+                }
+
+                $employee->dependents()->create($dependent);
+            }
+
+            return $employee;
+        });
 
         ActivityLogService::log(
             'Created',
@@ -142,6 +172,23 @@ class EmployeeController extends Controller
         );
 
         return redirect()->route('dashboard.employees.edit', $employee)->with('success', 'تم إضافة الموظف.');
+    }
+
+    public function checkNationalId(Request $request, string $nationalId): JsonResponse
+    {
+        $this->authorize('create', Employee::class);
+
+        $exists = false;
+        $rule = new UniqueNationalId();
+        $rule->validate('national_id', $nationalId, function () use (&$exists) {
+            $exists = true;
+        });
+
+        if (! $exists) {
+            $exists = SurveySubmission::where('national_id', $nationalId)->where('status', 'pending')->exists();
+        }
+
+        return response()->json(['exists' => $exists]);
     }
 
     public function edit(Employee $employee): View
@@ -201,7 +248,7 @@ class EmployeeController extends Controller
     /** @return array<string, mixed> */
     private function validateEmployee(Request $request, ?Employee $employee = null): array
     {
-        return $request->validate([
+        $rules = [
             'full_name' => 'required|string|max:255',
             'national_id' => [
                 'required',
@@ -213,6 +260,94 @@ class EmployeeController extends Controller
             'marital_status' => 'required|in:single,married,polygamous,widowed,divorced',
             'organization_unit_id' => 'required|exists:organization_units,id',
             'status' => 'nullable|in:pending,active,inactive',
-        ]);
+        ];
+
+        if ($employee === null) {
+            $rules += [
+                'dependents' => 'array',
+                'dependents.*.type' => 'required_with:dependents|in:spouse,child,parent',
+                'dependents.*.full_name' => 'required_with:dependents|string|max:255',
+                'dependents.*.national_id' => [
+                    'required_with:dependents',
+                    'string',
+                    'size:9',
+                    'distinct',
+                    new UniqueNationalId('dependents'),
+                ],
+                'dependents.*.gender' => 'required_with:dependents|in:male,female',
+                'dependents.*.parent_type' => 'nullable|in:father,mother',
+            ];
+        }
+
+        return $request->validate($rules);
+    }
+
+    /** @param array<string, mixed> $employee */
+    private function assertCreateNationalIdsAvailable(array $employee, array $dependents): void
+    {
+        if (SurveySubmission::where('national_id', $employee['national_id'])->where('status', 'pending')->exists()) {
+            throw ValidationException::withMessages([
+                'national_id' => 'رقم الهوية مستخدم مسبقاً في طلب استبيان قيد المراجعة.',
+            ]);
+        }
+
+        foreach ($dependents as $index => $dependent) {
+            if (SurveySubmission::where('national_id', $dependent['national_id'])->where('status', 'pending')->exists()) {
+                throw ValidationException::withMessages([
+                    "dependents.{$index}.national_id" => 'رقم الهوية مستخدم مسبقاً في طلب استبيان قيد المراجعة.',
+                ]);
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $employee */
+    private function assertCreateDependentsRules(array $employee, array $dependents): void
+    {
+        $spouseCount = 0;
+        $parentTypes = [];
+        $seenNationalIds = [$employee['national_id'] => true];
+
+        foreach ($dependents as $index => $dependent) {
+            if (isset($seenNationalIds[$dependent['national_id']])) {
+                throw ValidationException::withMessages([
+                    "dependents.{$index}.national_id" => 'رقم الهوية مستخدم مسبقاً في نفس الطلب.',
+                ]);
+            }
+
+            $seenNationalIds[$dependent['national_id']] = true;
+
+            if ($dependent['type'] === 'spouse') {
+                $spouseCount++;
+
+                if ($dependent['gender'] === ($employee['gender'] === 'male' ? 'male' : 'female')) {
+                    throw ValidationException::withMessages([
+                        "dependents.{$index}.gender" => 'جنس الزوج/ة يجب أن يخالف جنس الموظف.',
+                    ]);
+                }
+            }
+
+            if ($dependent['type'] === 'parent') {
+                if (empty($dependent['parent_type'])) {
+                    throw ValidationException::withMessages([
+                        "dependents.{$index}.parent_type" => 'يجب تحديد نوع الوالد (أب/أم).',
+                    ]);
+                }
+
+                if (isset($parentTypes[$dependent['parent_type']])) {
+                    throw ValidationException::withMessages([
+                        "dependents.{$index}.parent_type" => 'يوجد بالفعل سجل لهذا الوالد.',
+                    ]);
+                }
+
+                $parentTypes[$dependent['parent_type']] = true;
+            }
+        }
+
+        if ($spouseCount > 1 && $employee['marital_status'] !== 'polygamous') {
+            throw ValidationException::withMessages([
+                'dependents' => 'لا يمكن إضافة أكثر من زوج/ة واحدة إلا إذا كانت الحالة الزوجية متعدد الزوجات.',
+            ]);
+        }
     }
 }
+

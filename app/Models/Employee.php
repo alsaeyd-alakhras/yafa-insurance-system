@@ -38,6 +38,11 @@ class Employee extends Model
         return $this->hasMany(Visit::class);
     }
 
+    public function visitsAsPatient(): HasMany
+    {
+        return $this->hasMany(Visit::class, 'patient_employee_id');
+    }
+
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');

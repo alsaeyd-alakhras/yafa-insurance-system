@@ -78,29 +78,21 @@
         <li class="menu-header small">
             <span class="menu-header-text" data-i18n="Apps &amp; Pages">إدارة النظام</span>
         </li>
-        @can('view', 'App\Models\User')
-        <li class="menu-item {{ request()->is('users*') ? 'active' : '' }}">
-            <a href="{{ route('dashboard.users.index') }}" class="menu-link">
-                <i class="fa-solid fa-user-gear me-2"></i>
-                <div data-i18n="users">إدارة المستخدمين</div>
-            </a>
-        </li>
-        @endcan
         @if (
-            auth()->user()?->can('view', 'App\Models\Constant')
+            auth()->user()?->can('view', 'App\Models\User')
             || auth()->user()?->can('view', 'App\Models\ActivityLog')
         )
-        <li class="menu-item {{ request()->is('constants*') || request()->is('logs*') ? 'active open' : '' }}">
+        <li class="menu-item {{ request()->is('users*') || request()->is('logs*') ? 'active open' : '' }}">
             <a href="javascript:void(0)" class="menu-link menu-toggle">
                 <i class="fa-solid fa-gear me-2"></i>
                 <div data-i18n="settings">الإعدادات</div>
             </a>
             <ul class="menu-sub">
-                @can('view', 'App\Models\Constant')
-                <li class="menu-item {{ request()->is('constants*') ? 'active' : '' }}">
-                    <a href="{{ route('dashboard.constants.index') }}" class="menu-link">
-                        <i class="fa-solid fa-sliders me-2"></i>
-                        <div data-i18n="constants">ثوابت النظام</div>
+                @can('view', 'App\Models\User')
+                <li class="menu-item {{ request()->is('users*') ? 'active' : '' }}">
+                    <a href="{{ route('dashboard.users.index') }}" class="menu-link">
+                        <i class="fa-solid fa-user-gear me-2"></i>
+                        <div data-i18n="users">إدارة المستخدمين</div>
                     </a>
                 </li>
                 @endcan

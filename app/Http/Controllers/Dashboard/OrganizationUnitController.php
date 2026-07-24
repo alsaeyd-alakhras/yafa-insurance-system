@@ -20,7 +20,10 @@ class OrganizationUnitController extends Controller
             ->orderBy('name')
             ->get();
 
-        $allUnits = OrganizationUnit::orderBy('level')->orderBy('name')->get();
+        $allUnits = OrganizationUnit::where('level', '<', 3)
+            ->orderBy('level')
+            ->orderBy('name')
+            ->get();
 
         return view('dashboard.organization_units.index', compact('units', 'allUnits'));
     }
@@ -109,6 +112,10 @@ class OrganizationUnitController extends Controller
         $validated['level'] = $validated['parent_id']
             ? (OrganizationUnit::findOrFail($validated['parent_id'])->level + 1)
             : 1;
+
+        if ($validated['level'] > 3) {
+            abort(422, 'لا يمكن إضافة وحدة فرعية لقسم (المستوى الثالث) — هذا هو أعمق مستوى مسموح به.');
+        }
 
         return $validated;
     }
