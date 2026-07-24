@@ -235,6 +235,9 @@
                 const employeeGenderSelect = document.getElementById('gender');
                 const maritalStatusSelect = document.getElementById('marital_status');
                 const maritalStatusHint = document.getElementById('marital_status_gender_hint');
+                const employeeNationalIdInput = document.getElementById('national_id');
+                const employeeNationalIdFeedback = document.getElementById('national_id_feedback');
+                const checkNationalIdUrl = "{{ route('survey.check-national-id', ':nationalId') }}";
 
                 function escapeAttribute(value) {
                     return String(value || '')
@@ -478,16 +481,41 @@
                         updateEmptyMessages();
                         updateRowNumbers(type);
                         updateDependentLimits();
+                        recheckAllNationalIds();
                     }
                 });
 
-                const checkNationalIdUrl = "{{ route('survey.check-national-id', ':nationalId') }}";
+                function allNationalIdInputs() {
+                    const inputs = [];
+                    if (employeeNationalIdInput) {
+                        inputs.push({ input: employeeNationalIdInput, feedback: employeeNationalIdFeedback });
+                    }
+                    document.querySelectorAll('.dependent-national-id').forEach(function (input) {
+                        inputs.push({
+                            input: input,
+                            feedback: input.closest('.dependent-row')?.querySelector('.dependent-national-id-feedback'),
+                        });
+                    });
+                    return inputs;
+                }
 
-                function checkNationalId(value, feedbackEl) {
+                function onPageDuplicateExists(value, currentInput) {
+                    return allNationalIdInputs().some(function (entry) {
+                        return entry.input !== currentInput && entry.input.value.trim() === value;
+                    });
+                }
+
+                function checkNationalId(value, feedbackEl, currentInput) {
                     feedbackEl.textContent = '';
                     feedbackEl.className = 'small mt-1';
 
                     if (!value || value.length !== 9) {
+                        return;
+                    }
+
+                    if (currentInput && onPageDuplicateExists(value, currentInput)) {
+                        feedbackEl.textContent = 'رقم الهوية مكرر ضمن نفس النموذج.';
+                        feedbackEl.classList.add('text-danger');
                         return;
                     }
 
@@ -505,20 +533,52 @@
                         .catch(() => {});
                 }
 
-                const employeeNationalIdInput = document.getElementById('national_id');
-                const employeeNationalIdFeedback = document.getElementById('national_id_feedback');
+                function checkLocalDuplicateOnly(value, feedbackEl, currentInput) {
+                    if (!value || value.length !== 9) {
+                        return;
+                    }
+
+                    if (onPageDuplicateExists(value, currentInput)) {
+                        feedbackEl.textContent = 'رقم الهوية مكرر ضمن نفس النموذج.';
+                        feedbackEl.className = 'small mt-1 text-danger';
+                    }
+                }
+
+                function recheckAllNationalIds() {
+                    allNationalIdInputs().forEach(function (entry) {
+                        if (!entry.feedback) return;
+
+                        const value = entry.input.value.trim();
+                        const wasFlaggedDuplicate = entry.feedback.textContent === 'رقم الهوية مكرر ضمن نفس النموذج.';
+
+                        if (wasFlaggedDuplicate && (!value || value.length !== 9 || !onPageDuplicateExists(value, entry.input))) {
+                            entry.feedback.textContent = '';
+                            entry.feedback.className = 'small mt-1';
+                        }
+
+                        checkLocalDuplicateOnly(value, entry.feedback, entry.input);
+                    });
+                }
+
                 if (employeeNationalIdInput && employeeNationalIdFeedback) {
                     employeeNationalIdInput.addEventListener('blur', function () {
-                        checkNationalId(this.value.trim(), employeeNationalIdFeedback);
+                        checkNationalId(this.value.trim(), employeeNationalIdFeedback, employeeNationalIdInput);
                     });
+                    employeeNationalIdInput.addEventListener('input', recheckAllNationalIds);
                 }
 
                 document.addEventListener('blur', function (event) {
                     if (event.target.matches('.dependent-national-id')) {
                         const feedbackEl = event.target.closest('.dependent-row').querySelector('.dependent-national-id-feedback');
-                        checkNationalId(event.target.value.trim(), feedbackEl);
+                        checkNationalId(event.target.value.trim(), feedbackEl, event.target);
                     }
                 }, true);
+
+                document.addEventListener('input', function (event) {
+                    if (event.target.matches('.dependent-national-id')) {
+                        recheckAllNationalIds();
+                    }
+                });
 
                 oldDependents.forEach(function (dependent) {
                     if (sections[dependent.type]) {
