@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(MedicalDepartmentSeeder::class);
+        $this->call(OrganizationUnitSeeder::class);
 
         User::create([
             'name' => 'Alsaeyd J Alakhras',
