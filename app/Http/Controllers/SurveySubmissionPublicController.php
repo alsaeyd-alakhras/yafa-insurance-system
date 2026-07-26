@@ -24,7 +24,14 @@ class SurveySubmissionPublicController extends Controller
             return view('survey.closed');
         }
 
-        $organizationUnits = OrganizationUnit::orderBy('name')->get();
+        $organizationUnits = OrganizationUnit::query()
+            ->whereNull('parent_id')
+            ->with([
+                'children' => fn ($query) => $query->orderBy('name'),
+                'children.children' => fn ($query) => $query->orderBy('name'),
+            ])
+            ->orderBy('name')
+            ->get();
 
         return view('survey.form', compact('organizationUnits'));
     }

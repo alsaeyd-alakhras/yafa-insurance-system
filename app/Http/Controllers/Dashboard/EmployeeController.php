@@ -121,7 +121,14 @@ class EmployeeController extends Controller
     {
         $this->authorize('create', Employee::class);
 
-        $organizationUnits = OrganizationUnit::orderBy('name')->get();
+        $organizationUnits = OrganizationUnit::query()
+            ->whereNull('parent_id')
+            ->with([
+                'children' => fn ($query) => $query->orderBy('name'),
+                'children.children' => fn ($query) => $query->orderBy('name'),
+            ])
+            ->orderBy('name')
+            ->get();
 
         return view('dashboard.employees.create', compact('organizationUnits'));
     }
@@ -196,7 +203,14 @@ class EmployeeController extends Controller
         $this->authorize('update', $employee);
 
         $employee->load('dependents');
-        $organizationUnits = OrganizationUnit::orderBy('name')->get();
+        $organizationUnits = OrganizationUnit::query()
+            ->whereNull('parent_id')
+            ->with([
+                'children' => fn ($query) => $query->orderBy('name'),
+                'children.children' => fn ($query) => $query->orderBy('name'),
+            ])
+            ->orderBy('name')
+            ->get();
 
         return view('dashboard.employees.edit', compact('employee', 'organizationUnits'));
     }
