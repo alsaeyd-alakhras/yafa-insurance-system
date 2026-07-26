@@ -62,6 +62,7 @@ Route::group([
     Route::put('visits/{visit}/departments/{visitDepartment}', [VisitController::class, 'updateDepartmentAmount'])->name('visits.departments.update-amount');
 
     Route::get('survey-submissions', [SurveySubmissionController::class, 'index'])->name('survey-submissions.index');
+    Route::get('survey-submissions-filters/{column}', [SurveySubmissionController::class, 'getFilterOptions'])->name('survey-submissions.filters');
     Route::put('survey-submissions-window', [SurveySubmissionController::class, 'updateWindow'])->name('survey-submissions.update-window');
     Route::get('survey-submissions/{surveySubmission}', [SurveySubmissionController::class, 'show'])->name('survey-submissions.show');
     Route::post('survey-submissions/{surveySubmission}/approve', [SurveySubmissionController::class, 'approve'])->name('survey-submissions.approve');
