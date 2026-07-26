@@ -276,16 +276,22 @@
                 }
             }
 
-            function recheckAllNationalIds() {
+            function recheckAllNationalIds(changedInput) {
                 allNationalIdInputs().forEach(function (entry) {
                     if (!entry.feedback) return;
 
                     const value = entry.input.value.trim();
-                    const wasFlaggedDuplicate = entry.feedback.textContent === 'رقم الهوية مكرر ضمن نفس النموذج.';
 
-                    if (wasFlaggedDuplicate && (!value || value.length !== 9 || !onPageDuplicateExists(value, entry.input))) {
+                    if (entry.input === changedInput) {
                         entry.feedback.textContent = '';
                         entry.feedback.className = 'small mt-1';
+                    } else {
+                        const wasFlaggedDuplicate = entry.feedback.textContent === 'رقم الهوية مكرر ضمن نفس النموذج.';
+
+                        if (wasFlaggedDuplicate && (!value || value.length !== 9 || !onPageDuplicateExists(value, entry.input))) {
+                            entry.feedback.textContent = '';
+                            entry.feedback.className = 'small mt-1';
+                        }
                     }
 
                     checkLocalDuplicateOnly(value, entry.feedback, entry.input);
@@ -494,7 +500,9 @@
                 employeeNationalIdInput.addEventListener('blur', function () {
                     checkNationalId(this.value.trim(), employeeNationalIdFeedback, employeeNationalIdInput);
                 });
-                employeeNationalIdInput.addEventListener('input', recheckAllNationalIds);
+                employeeNationalIdInput.addEventListener('input', function () {
+                    recheckAllNationalIds(employeeNationalIdInput);
+                });
             }
 
             document.addEventListener('blur', function (event) {
@@ -506,7 +514,7 @@
 
             document.addEventListener('input', function (event) {
                 if (event.target.matches('.dependent-national-id')) {
-                    recheckAllNationalIds();
+                    recheckAllNationalIds(event.target);
                 }
             });
 
