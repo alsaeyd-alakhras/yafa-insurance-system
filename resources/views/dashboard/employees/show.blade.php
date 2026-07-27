@@ -10,6 +10,7 @@
         ];
         $statusLabels = ['pending' => 'قيد الموافقة', 'active' => 'نشط', 'inactive' => 'غير نشط'];
         $parentTypeLabels = ['father' => 'أب', 'mother' => 'أم'];
+        $organizationChain = $employee->organizationUnit?->ancestryChain();
         $dependentGroups = [
             'spouse' => ['title' => 'الزوجات/الزوج', 'empty' => 'لا يوجد زوج/ة مضافون.'],
             'child' => ['title' => 'الأبناء', 'empty' => 'لا يوجد أبناء مضافون.'],
@@ -45,9 +46,17 @@
                         <div class="text-muted small">الحالة الزوجية</div>
                         <div class="fw-semibold">{{ $maritalLabels[$employee->marital_status] ?? $employee->marital_status }}</div>
                     </div>
-                    <div class="mb-4 col-md-6">
-                        <div class="text-muted small">الوحدة التنظيمية</div>
-                        <div class="fw-semibold">{{ $employee->organizationUnit?->name ?? '-' }}</div>
+                    <div class="mb-4 col-md-4">
+                        <div class="text-muted small">مركزية</div>
+                        <div class="fw-semibold">{{ $organizationChain['center']?->name ?? '-' }}</div>
+                    </div>
+                    <div class="mb-4 col-md-4">
+                        <div class="text-muted small">دائرة</div>
+                        <div class="fw-semibold">{{ $organizationChain['department']?->name ?? '-' }}</div>
+                    </div>
+                    <div class="mb-4 col-md-4">
+                        <div class="text-muted small">قسم</div>
+                        <div class="fw-semibold">{{ $organizationChain['section']?->name ?? '-' }}</div>
                     </div>
                     <div class="mb-4 col-md-6">
                         <div class="text-muted small">حالة الموظف</div>

@@ -40,12 +40,22 @@ class EmployeeController extends Controller
         $this->authorize('view', Employee::class);
 
         if ($request->ajax()) {
-            $query = Employee::query()->with('organizationUnit');
+            $query = Employee::query()->with('organizationUnit.parent.parent')->withCount('dependents');
             $this->applyColumnFilters($query, $request);
             $this->applySort($query, $request);
 
             return DataTables::of($query)
+                ->addIndexColumn()
                 ->addColumn('organization_unit_name', fn (Employee $employee) => $employee->organizationUnit?->name ?? '-')
+                ->addColumn('organization_center', function (Employee $employee) {
+                    return $employee->organizationUnit?->ancestryChain()['center']?->name ?? '-';
+                })
+                ->addColumn('organization_department', function (Employee $employee) {
+                    return $employee->organizationUnit?->ancestryChain()['department']?->name ?? '-';
+                })
+                ->addColumn('organization_section', function (Employee $employee) {
+                    return $employee->organizationUnit?->ancestryChain()['section']?->name ?? '-';
+                })
                 ->addColumn('status_label', fn (Employee $employee) => self::STATUS_LABELS[$employee->status] ?? $employee->status)
                 ->addColumn('marital_status_label', fn (Employee $employee) => self::MARITAL_STATUS_LABELS[$employee->marital_status] ?? $employee->marital_status)
                 ->addColumn('edit', fn (Employee $employee) => $employee->id)
@@ -137,7 +147,7 @@ class EmployeeController extends Controller
     {
         $this->authorize('view', $employee);
 
-        $employee->load(['organizationUnit', 'dependents']);
+        $employee->load(['organizationUnit.parent.parent', 'dependents']);
 
         return view('dashboard.employees.show', compact('employee'));
     }

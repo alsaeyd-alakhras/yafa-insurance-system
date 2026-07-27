@@ -26,10 +26,89 @@
                 min-width: var(--sticky-col2-width);
             }
 
+            #surveySubmissionDetailsModal .modal-dialog {
+                max-width: 960px;
+            }
+
+            #surveySubmissionDetailsModal .modal-body {
+                max-height: 75vh;
+            }
+
             .survey-detail-summary {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 12px;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 14px;
+                background: rgba(67, 89, 113, .02);
+                border: 1px solid rgba(67, 89, 113, .12);
+                border-radius: .5rem;
+                padding: 1rem 1.25rem;
+            }
+
+            .survey-detail-summary > div {
+                display: flex;
+                flex-direction: column;
+                gap: .15rem;
+            }
+
+            .survey-detail-summary strong {
+                font-size: .75rem;
+                color: #8592a3;
+                font-weight: 600;
+            }
+
+            .survey-detail-section {
+                margin-top: 1.5rem;
+                border: 1px solid rgba(67, 89, 113, .16);
+                border-right: 4px solid #696cff;
+                border-radius: .5rem;
+                overflow: hidden;
+            }
+
+            .survey-detail-section .table-responsive {
+                height: auto;
+                border-radius: 0;
+                box-shadow: none;
+                border: 0;
+                overflow-x: auto;
+            }
+
+            .survey-detail-section h6 {
+                margin: 0;
+                padding: .65rem 1rem;
+                background: rgba(67, 89, 113, .04);
+                font-weight: 600;
+            }
+
+            #surveySubmissionDetailsModal .survey-dependent-table {
+                margin-bottom: 0;
+                --bs-table-bg: transparent;
+            }
+
+            #surveySubmissionDetailsModal .survey-dependent-table > :not(caption) > * > * {
+                padding: .75rem 1rem !important;
+                vertical-align: middle;
+                white-space: nowrap;
+                border-bottom: 0;
+            }
+
+            #surveySubmissionDetailsModal .survey-dependent-table > thead > tr > th {
+                background: #fff;
+                border-bottom: 1px solid rgba(67, 89, 113, .16) !important;
+                font-size: .75rem;
+            }
+
+            #surveySubmissionDetailsModal .survey-dependent-table > tbody > tr:not(:last-child) > td {
+                border-bottom: 1px solid rgba(67, 89, 113, .08) !important;
+            }
+
+            #surveySubmissionDetailsModal .survey-dependent-table > tbody > tr:nth-of-type(odd) > td {
+                background: rgba(67, 89, 113, .015);
+            }
+
+            .survey-detail-actions {
+                margin-top: 1.5rem;
+                padding-top: 1rem;
+                border-top: 1px solid rgba(67, 89, 113, .16);
             }
         </style>
     @endpush
@@ -176,7 +255,7 @@
     @endcan
 
     <div class="modal fade" id="surveySubmissionDetailsModal" tabindex="-1" aria-labelledby="surveySubmissionDetailsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="surveySubmissionDetailsModalLabel">تفاصيل طلب الاستبيان</h5>
@@ -272,8 +351,10 @@
         <script type="text/javascript" src="{{ asset('js/datatable.js') }}"></script>
         <script>
             function dependentRows(rows, includeParentType) {
+                const columnCount = includeParentType ? 4 : 3;
+
                 if (!rows.length) {
-                    return '<tr><td colspan="4" class="text-center text-muted">لا يوجد</td></tr>';
+                    return `<tr><td colspan="${columnCount}" class="text-center text-muted">لا يوجد</td></tr>`;
                 }
 
                 return rows.map(function (row) {
@@ -282,7 +363,7 @@
                             <td>${escapeHtml(row.full_name || '-')}</td>
                             <td class="text-center">${escapeHtml(row.national_id || '-')}</td>
                             <td class="text-center">${escapeHtml(row.gender || '-')}</td>
-                            <td class="text-center">${includeParentType ? escapeHtml(row.parent_type || '-') : '-'}</td>
+                            ${includeParentType ? `<td class="text-center">${escapeHtml(row.parent_type || '-')}</td>` : ''}
                         </tr>
                     `;
                 }).join('');
@@ -290,16 +371,16 @@
 
             function dependentSection(title, rows, includeParentType) {
                 return `
-                    <div class="mt-4">
-                        <h6 class="mb-2">${title}</h6>
+                    <div class="survey-detail-section">
+                        <h6>${title}</h6>
                         <div class="table-responsive">
-                            <table class="table table-sm table-striped mb-0">
+                            <table class="table survey-dependent-table mb-0">
                                 <thead>
                                     <tr>
                                         <th>الاسم</th>
                                         <th class="text-center">رقم الهوية</th>
                                         <th class="text-center">الجنس</th>
-                                        <th class="text-center">نوع الوالد</th>
+                                        ${includeParentType ? '<th class="text-center">نوع الوالد</th>' : ''}
                                     </tr>
                                 </thead>
                                 <tbody>${dependentRows(rows, includeParentType)}</tbody>
@@ -314,7 +395,7 @@
                 const dependents = response.dependents || { spouses: [], children: [], parents: [] };
                 const actions = abilityUpdate && response.can_update && employee.status === 'pending'
                     ? `
-                        <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center">
+                        <div class="survey-detail-actions d-flex justify-content-between align-items-center">
                             <button type="button" class="btn btn-outline-danger btn-survey-reject" data-url="${response.urls.reject}">
                                 <i class="fa-solid fa-xmark me-1"></i> رفض
                             </button>
@@ -327,12 +408,12 @@
 
                 return `
                     <div class="survey-detail-summary">
-                        <div><strong>الاسم:</strong> ${escapeHtml(employee.full_name || '-')}</div>
-                        <div><strong>رقم الهوية:</strong> ${escapeHtml(employee.national_id || '-')}</div>
-                        <div><strong>الجنس:</strong> ${escapeHtml(employee.gender || '-')}</div>
-                        <div><strong>الحالة الزوجية:</strong> ${escapeHtml(employee.marital_status || '-')}</div>
-                        <div><strong>الوحدة التنظيمية:</strong> ${escapeHtml(employee.organization_unit_name || '-')}</div>
-                        <div><strong>حالة الطلب:</strong> ${renderStatusBadge(employee.status, employee.status_label)}</div>
+                        <div><strong>الاسم</strong><span>${escapeHtml(employee.full_name || '-')}</span></div>
+                        <div><strong>رقم الهوية</strong><span>${escapeHtml(employee.national_id || '-')}</span></div>
+                        <div><strong>الجنس</strong><span>${escapeHtml(employee.gender || '-')}</span></div>
+                        <div><strong>الحالة الزوجية</strong><span>${escapeHtml(employee.marital_status || '-')}</span></div>
+                        <div><strong>الوحدة التنظيمية</strong><span>${escapeHtml(employee.organization_unit_name || '-')}</span></div>
+                        <div><strong>حالة الطلب</strong><span>${renderStatusBadge(employee.status, employee.status_label)}</span></div>
                     </div>
                     ${dependentSection('زوجات/أزواج', dependents.spouses || [], false)}
                     ${dependentSection('أبناء', dependents.children || [], false)}

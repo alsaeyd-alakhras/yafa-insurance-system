@@ -25,6 +25,24 @@
                 width: var(--sticky-col2-width);
                 min-width: var(--sticky-col2-width);
             }
+
+            .dependents-count-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 1.75rem;
+                padding: .25rem .55rem;
+                border-radius: 50rem;
+                font-size: .8125rem;
+                font-weight: 600;
+                background: rgba(105, 108, 255, .1);
+                color: #696cff;
+            }
+
+            .dependents-count-badge.is-empty {
+                background: rgba(67, 89, 113, .06);
+                color: #8592a3;
+            }
         </style>
     @endpush
 
@@ -64,7 +82,10 @@
             'national_id' => 'رقم الهوية',
             'gender' => 'الجنس',
             'marital_status' => 'الحالة الزوجية',
-            'organization_unit_name' => 'الوحدة التنظيمية',
+            'organization_center' => 'مركزية',
+            'organization_department' => 'دائرة',
+            'organization_unit_name' => 'قسم',
+            'dependents_count' => 'عدد التابعين',
             'status' => 'الحالة',
         ];
         $filterableFields = ['gender', 'marital_status', 'status', 'organization_unit_name'];
@@ -164,7 +185,7 @@
                 divorced: 'مطلق/ة',
             };
 
-            const fields = ['#', 'edit', 'full_name', 'national_id', 'gender', 'marital_status', 'organization_unit_name', 'status', 'delete'];
+            const fields = ['#', 'edit', 'full_name', 'national_id', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_unit_name', 'dependents_count', 'status', 'delete'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
@@ -194,7 +215,17 @@
                     data: 'marital_status', name: 'marital_status', orderable: false, class: 'text-center',
                     render: function (data) { return maritalLabels[data] || data; },
                 },
+                { data: 'organization_center', name: 'organization_center', orderable: false, searchable: false },
+                { data: 'organization_department', name: 'organization_department', orderable: false, searchable: false },
                 { data: 'organization_unit_name', name: 'organization_unit_name', orderable: false },
+                {
+                    data: 'dependents_count', name: 'dependents_count', orderable: false, searchable: false, class: 'text-center',
+                    render: function (data) {
+                        const count = Number(data) || 0;
+                        const cls = count > 0 ? 'dependents-count-badge' : 'dependents-count-badge is-empty';
+                        return `<span class="${cls}">${count}</span>`;
+                    },
+                },
                 {
                     data: 'status', name: 'status', orderable: false, class: 'text-center',
                     render: function (data) { return statusLabels[data] || data; },

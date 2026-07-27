@@ -27,4 +27,29 @@ class OrganizationUnit extends Model
     {
         return $this->hasMany(Employee::class);
     }
+
+    /**
+     * Resolve this unit's ancestor chain (center, department, section) regardless of its own level.
+     *
+     * @return array{center: ?self, department: ?self, section: ?self}
+     */
+    public function ancestryChain(): array
+    {
+        $chain = [$this];
+        $current = $this;
+
+        while ($current->parent) {
+            $current = $current->parent;
+            $chain[] = $current;
+        }
+
+        // $chain is ordered from this unit up to the root; reverse so index 0 = level 1 (center).
+        $chain = array_reverse($chain);
+
+        return [
+            'center' => $chain[0] ?? null,
+            'department' => $chain[1] ?? null,
+            'section' => $chain[2] ?? null,
+        ];
+    }
 }
