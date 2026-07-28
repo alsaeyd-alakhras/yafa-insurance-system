@@ -27,7 +27,11 @@
                 min-width: var(--sticky-col2-width);
             }
 
-            #patient-search-results .list-group-item { cursor: pointer; }
+            #patient-search-results .patient-choice { cursor: pointer; }
+            #patient-search-results .family-card { border-color: #e3e7ed; }
+            #patient-search-results .family-header { background: #f7f9fb; }
+            #visits-table td.amount-column { direction: ltr; font-variant-numeric: tabular-nums; white-space: nowrap; }
+            #visits-table td { vertical-align: middle; padding-top: .7rem; padding-bottom: .7rem; }
         </style>
     @endpush
 
@@ -39,6 +43,11 @@
                 </button>
             </div>
         @endcan
+        <div class="nav-item d-flex align-items-center">
+            <i class="fa-solid fa-circle-info text-muted"
+                data-bs-toggle="tooltip"
+                title="الجدول يعرض زيارات اليوم افتراضياً — استخدم فلتر التاريخ بعمود 'التاريخ' لعرض زيارات تواريخ أخرى."></i>
+        </div>
         <div class="nav-item">
             <select class="form-control" name="advanced-pagination" id="advanced-pagination">
                 <option value="50">50</option>
@@ -59,11 +68,6 @@
             </button>
         </div>
     </x-slot:extra_nav>
-
-    <p class="text-muted mb-3">
-        <i class="fa-solid fa-circle-info me-1"></i>
-        الجدول يعرض زيارات اليوم افتراضياً — استخدم فلتر التاريخ بعمود "التاريخ" لعرض زيارات تواريخ أخرى.
-    </p>
 
     @php
         $fields = [
@@ -193,18 +197,6 @@
                             <span>المريض المختار: <strong id="selected-patient-name"></strong></span>
                             <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-change-patient">تغيير</button>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="new-visit-clinic-id">العيادة (اختياري — للكشف الطبي فقط)</label>
-                            <select class="form-select" id="new-visit-clinic-id">
-                                <option value="">بدون عيادة</option>
-                                @foreach (\App\Models\Clinic::where('is_active', true)->orderBy('name')->get() as $clinic)
-                                    <option value="{{ $clinic->id }}">{{ $clinic->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-primary" id="btn-check-quota">
-                            <i class="fa-solid fa-magnifying-glass me-1"></i> فحص الرصيد
-                        </button>
                         <div id="quota-result" class="mt-3"></div>
                     </div>
                 </div>
@@ -215,7 +207,6 @@
     <form id="create-visit-form" action="{{ route('dashboard.visits.store') }}" method="post" class="d-none">
         @csrf
         <input type="hidden" name="national_id" id="create-visit-national-id">
-        <input type="hidden" name="clinic_id" id="create-visit-clinic-id">
     </form>
 
     <x-confirm-modal />
@@ -250,8 +241,8 @@
                 { data: 'employee_name', name: 'employee_name', orderable: false },
                 { data: 'clinic_name', name: 'clinic_name', orderable: false },
                 { data: 'departments_list', name: 'departments_list', orderable: false },
-                { data: 'total_before_discount', name: 'total_before_discount', orderable: false, class: 'text-center' },
-                { data: 'total_after_discount', name: 'total_after_discount', orderable: false, class: 'text-center' },
+                { data: 'total_before_discount', name: 'total_before_discount', orderable: false, class: 'text-center amount-column' },
+                { data: 'total_after_discount', name: 'total_after_discount', orderable: false, class: 'text-center amount-column' },
                 { data: 'recorded_by_name', name: 'recorded_by_name', orderable: false },
                 {
                     data: 'delete', name: 'delete', orderable: false, searchable: false,
@@ -278,7 +269,100 @@
                 $('#patient-search-results').empty();
                 $('#selected-patient-panel').addClass('d-none');
                 $('#quota-result').empty();
-                $('#new-visit-clinic-id').val('');
+            }
+
+            function selectPatient(patient, label) {
+                selectedPatient = patient;
+                $('#selected-patient-name').text(label);
+                $('#selected-patient-panel').removeClass('d-none');
+                $('#patient-search-results').empty();
+                $('#patient-search-input').val('');
+
+                const $result = $('#quota-result').html(
+                    '<div class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>جارِ فحص الرصيد وزيارات اليوم...</div>'
+                );
+
+                $.ajax({
+                    url: '{{ route('dashboard.visits.search') }}',
+                    method: 'GET',
+                    data: { national_id: patient.national_id },
+                    success: function (response) {
+                        if (response.redirect) {
+                            $result.html(`
+                                <div class="alert alert-info mb-0">
+                                    توجد زيارة اليوم لهذا المريض.
+                                    <a class="btn btn-sm btn-primary ms-3" href="${response.redirect}">فتح الزيارة</a>
+                                </div>
+                            `);
+                            return;
+                        }
+
+                        if (response.remaining_quota <= 0) {
+                            $result.html('<div class="alert alert-danger mb-0"><strong>انتهى الرصيد الشهري.</strong> الرصيد المتبقي: 0 / 2</div>');
+                            return;
+                        }
+
+                        $result.html(`
+                            <div class="alert alert-success mb-0">
+                                الرصيد المتبقي هذا الشهر: <strong>${response.remaining_quota} / 2</strong>
+                                <button type="button" class="btn btn-sm btn-primary ms-3" id="btn-create-visit">تسجيل الزيارة</button>
+                            </div>
+                        `);
+                    },
+                    error: function (xhr) {
+                        const message = xhr.responseJSON?.message || 'حدث خطأ أثناء البحث';
+                        $result.html($('<div class="alert alert-danger mb-0"></div>').text(message));
+                    },
+                });
+            }
+
+            function patientButton(person, suffix) {
+                return $('<button type="button" class="patient-choice list-group-item list-group-item-action py-2"></button>')
+                    .append($('<span class="fw-semibold"></span>').text(person.full_name))
+                    .append($('<small class="text-muted ms-2"></small>').text(`${person.national_id}${suffix ? ` — ${suffix}` : ''}`))
+                    .on('click', function () {
+                        selectPatient(person, `${person.full_name} — ${person.national_id}`);
+                    });
+            }
+
+            function renderFamilyResults(families) {
+                const $results = $('#patient-search-results').empty();
+
+                if (!families.length) {
+                    $results.html('<div class="text-muted border rounded p-3">لا توجد نتائج</div>');
+                    return;
+                }
+
+                const groups = [
+                    { key: 'spouses', label: 'أزواج' },
+                    { key: 'children', label: 'أبناء' },
+                    { key: 'parents', label: 'والدين' },
+                ];
+
+                families.forEach(function (family) {
+                    const $card = $('<div class="family-card card mb-3"></div>');
+                    const $header = $('<div class="family-header card-header p-2"></div>');
+                    $header.append(patientButton(family, 'الموظف صاحب الرصيد'));
+                    $card.append($header);
+
+                    const $body = $('<div class="card-body p-2"></div>');
+                    groups.forEach(function (group) {
+                        const people = family.dependents[group.key] || [];
+                        if (!people.length) return;
+
+                        $body.append($('<div class="small fw-bold text-primary mt-2 mb-1"></div>').text(group.label));
+                        const $list = $('<div class="list-group list-group-flush border rounded"></div>');
+                        people.forEach(function (person) {
+                            let suffix = '';
+                            if (person.parent_type === 'father') suffix = 'الأب';
+                            if (person.parent_type === 'mother') suffix = 'الأم';
+                            $list.append(patientButton(person, suffix));
+                        });
+                        $body.append($list);
+                    });
+                    $card.append($body);
+                    $results.append($card);
+                });
             }
 
             $(document).on('click', '#btn-open-new-visit', function () {
@@ -303,24 +387,10 @@
                         method: 'GET',
                         data: { term: term },
                         success: function (response) {
-                            $results.empty();
-                            if (!response.length) {
-                                $results.html('<div class="list-group-item text-muted">لا توجد نتائج</div>');
-                                return;
-                            }
-                            response.forEach(function (item) {
-                                const $item = $('<button type="button" class="list-group-item list-group-item-action"></button>')
-                                    .text(item.label)
-                                    .on('click', function () {
-                                        selectedPatient = item;
-                                        $('#selected-patient-name').text(item.label);
-                                        $('#selected-patient-panel').removeClass('d-none');
-                                        $('#patient-search-results').empty();
-                                        $('#patient-search-input').val('');
-                                        $('#quota-result').empty();
-                                    });
-                                $results.append($item);
-                            });
+                            renderFamilyResults(response);
+                        },
+                        error: function () {
+                            $results.html('<div class="alert alert-danger mb-0">حدث خطأ أثناء البحث عن المرضى.</div>');
                         },
                     });
                 }, 300);
@@ -331,44 +401,14 @@
                 $('#patient-search-input').trigger('focus');
             });
 
-            $(document).on('click', '#btn-check-quota', function () {
-                if (!selectedPatient) return;
-
-                const clinicId = $('#new-visit-clinic-id').val();
-                const $result = $('#quota-result');
-                $result.empty();
-
-                $.ajax({
-                    url: '{{ route('dashboard.visits.search') }}',
-                    method: 'GET',
-                    data: { national_id: selectedPatient.national_id, clinic_id: clinicId },
-                    success: function (response) {
-                        if (response.redirect) {
-                            $result.html('<div class="alert alert-info">توجد زيارة مسجّلة لهذا المريض اليوم لهذه العيادة — جارِ التوجيه...</div>');
-                            window.location.href = response.redirect;
-                            return;
-                        }
-
-                        const quotaColor = response.remaining_quota > 0 ? 'success' : 'danger';
-                        $result.html(`
-                            <div class="alert alert-${quotaColor}">
-                                الرصيد المتبقي هذا الشهر: <strong>${response.remaining_quota} / 2</strong>
-                                ${response.remaining_quota > 0 ? '<button type="button" class="btn btn-sm btn-primary ms-3" id="btn-create-visit">تسجيل الزيارة</button>' : ''}
-                            </div>
-                        `);
-                    },
-                    error: function (xhr) {
-                        const message = xhr.responseJSON?.message || 'حدث خطأ أثناء البحث';
-                        $result.html(`<div class="alert alert-danger">${message}</div>`);
-                    },
-                });
-            });
-
             $(document).on('click', '#btn-create-visit', function () {
                 if (!selectedPatient) return;
                 $('#create-visit-national-id').val(selectedPatient.national_id);
-                $('#create-visit-clinic-id').val($('#new-visit-clinic-id').val());
                 $('#create-visit-form').trigger('submit');
+            });
+
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+                new bootstrap.Tooltip(element);
             });
         </script>
     @endpush

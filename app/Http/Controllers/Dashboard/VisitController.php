@@ -135,30 +135,51 @@ class VisitController extends Controller
             return response()->json([]);
         }
 
+        $matchingEmployeeIds = Employee::query()
+            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")
+                ->orWhere('national_id', 'like', "%{$term}%"))
+            ->limit(10)
+            ->pluck('id');
+
+        $matchingDependentOwnerIds = Dependent::query()
+            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")
+                ->orWhere('national_id', 'like', "%{$term}%"))
+            ->limit(10)
+            ->pluck('employee_id');
+
+        $employeeIds = $matchingEmployeeIds->concat($matchingDependentOwnerIds)->unique()->take(10)->values();
+
         $employees = Employee::query()
-            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")->orWhere('national_id', 'like', "%{$term}%"))
-            ->limit(10)
+            ->with(['dependents' => fn ($query) => $query->orderBy('type')->orderBy('full_name')])
+            ->whereIn('id', $employeeIds)
             ->get()
-            ->map(fn (Employee $employee) => [
-                'type' => 'employee',
-                'national_id' => $employee->national_id,
-                'full_name' => $employee->full_name,
-                'label' => "{$employee->full_name} — {$employee->national_id} (موظف)",
-            ]);
+            ->sortBy(fn (Employee $employee) => $employeeIds->search($employee->id))
+            ->values()
+            ->map(function (Employee $employee) {
+                $dependents = $employee->dependents->map(fn (Dependent $dependent) => [
+                    'id' => $dependent->id,
+                    'type' => 'dependent',
+                    'dependent_type' => $dependent->type,
+                    'parent_type' => $dependent->parent_type,
+                    'gender' => $dependent->gender,
+                    'national_id' => $dependent->national_id,
+                    'full_name' => $dependent->full_name,
+                ]);
 
-        $dependents = Dependent::query()
-            ->with('employee')
-            ->where(fn ($q) => $q->where('full_name', 'like', "%{$term}%")->orWhere('national_id', 'like', "%{$term}%"))
-            ->limit(10)
-            ->get()
-            ->map(fn (Dependent $dependent) => [
-                'type' => 'dependent',
-                'national_id' => $dependent->national_id,
-                'full_name' => $dependent->full_name,
-                'label' => "{$dependent->full_name} — {$dependent->national_id} (تابع لـ: {$dependent->employee?->full_name})",
-            ]);
+                return [
+                    'id' => $employee->id,
+                    'type' => 'employee',
+                    'full_name' => $employee->full_name,
+                    'national_id' => $employee->national_id,
+                    'dependents' => [
+                        'spouses' => $dependents->where('dependent_type', 'spouse')->values(),
+                        'children' => $dependents->where('dependent_type', 'child')->values(),
+                        'parents' => $dependents->where('dependent_type', 'parent')->values(),
+                    ],
+                ];
+            });
 
-        return response()->json($employees->concat($dependents)->take(15)->values());
+        return response()->json($employees);
     }
 
     public function search(Request $request): JsonResponse
@@ -167,41 +188,27 @@ class VisitController extends Controller
 
         $validated = $request->validate([
             'national_id' => 'required|string|size:9',
-            'clinic_id' => 'nullable|exists:clinics,id',
         ]);
 
-        $employee = Employee::where('national_id', $validated['national_id'])->first();
-        $dependent = $employee ? null : Dependent::where('national_id', $validated['national_id'])->first();
+        $resolution = $this->resolvePatientVisit($validated['national_id']);
 
-        if (! $employee && ! $dependent) {
+        if (! $resolution) {
             return response()->json(['message' => 'لا يوجد موظف أو تابع بهذا الرقم.'], 404);
         }
 
-        $patientEmployeeId = $employee?->id;
-        $patientDependentId = $dependent?->id;
-        $quotaOwner = $employee ?? $dependent->employee;
-        $clinicId = $validated['clinic_id'] ?? null;
-
-        $existingVisit = Visit::query()
-            ->when($patientEmployeeId, fn ($q) => $q->where('patient_employee_id', $patientEmployeeId))
-            ->when($patientDependentId, fn ($q) => $q->where('patient_dependent_id', $patientDependentId))
-            ->whereDate('visit_date', now()->toDateString())
-            ->where('clinic_id', $clinicId)
-            ->first();
-
-        if ($existingVisit) {
+        if ($resolution['existing_visit']) {
             return response()->json([
-                'existing_visit_id' => $existingVisit->id,
-                'redirect' => route('dashboard.visits.edit', $existingVisit),
+                'existing_visit_id' => $resolution['existing_visit']->id,
+                'redirect' => route('dashboard.visits.edit', $resolution['existing_visit']),
             ]);
         }
 
         return response()->json([
-            'patient_type' => $employee ? 'employee' : 'dependent',
-            'patient_id' => $employee?->id ?? $dependent?->id,
-            'patient_name' => $employee?->full_name ?? $dependent?->full_name,
-            'quota_owner_employee_id' => $quotaOwner->id,
-            'remaining_quota' => $quotaOwner->remainingQuota(),
+            'patient_type' => $resolution['employee'] ? 'employee' : 'dependent',
+            'patient_id' => $resolution['employee']?->id ?? $resolution['dependent']?->id,
+            'patient_name' => $resolution['employee']?->full_name ?? $resolution['dependent']?->full_name,
+            'quota_owner_employee_id' => $resolution['quota_owner']->id,
+            'remaining_quota' => $resolution['remaining_quota'],
         ]);
     }
 
@@ -211,30 +218,22 @@ class VisitController extends Controller
 
         $validated = $request->validate([
             'national_id' => 'required|string|size:9',
-            'clinic_id' => 'nullable|exists:clinics,id',
         ]);
 
-        $employee = Employee::where('national_id', $validated['national_id'])->first();
-        $dependent = $employee ? null : Dependent::where('national_id', $validated['national_id'])->first();
+        $resolution = $this->resolvePatientVisit($validated['national_id']);
 
-        abort_unless($employee || $dependent, 404, 'لا يوجد موظف أو تابع بهذا الرقم.');
+        abort_unless($resolution, 404, 'لا يوجد موظف أو تابع بهذا الرقم.');
 
-        $quotaOwner = $employee ?? $dependent->employee;
-        $clinicId = $validated['clinic_id'] ?? null;
+        $employee = $resolution['employee'];
+        $dependent = $resolution['dependent'];
+        $quotaOwner = $resolution['quota_owner'];
 
-        $existingVisit = Visit::query()
-            ->when($employee, fn ($q) => $q->where('patient_employee_id', $employee->id))
-            ->when($dependent, fn ($q) => $q->where('patient_dependent_id', $dependent->id))
-            ->whereDate('visit_date', now()->toDateString())
-            ->where('clinic_id', $clinicId)
-            ->first();
-
-        if ($existingVisit) {
-            return redirect()->route('dashboard.visits.edit', $existingVisit)
+        if ($resolution['existing_visit']) {
+            return redirect()->route('dashboard.visits.edit', $resolution['existing_visit'])
                 ->with('info', 'توجد زيارة مسجّلة لهذا المريض اليوم — تمت إضافتك لها.');
         }
 
-        if ($quotaOwner->remainingQuota() <= 0) {
+        if ($resolution['remaining_quota'] <= 0) {
             return redirect()->route('dashboard.visits.index')
                 ->with('danger', 'انتهت زيارات هذا الشهر لهذا الموظف.');
         }
@@ -243,7 +242,7 @@ class VisitController extends Controller
             'employee_id' => $quotaOwner->id,
             'patient_employee_id' => $employee?->id,
             'patient_dependent_id' => $dependent?->id,
-            'clinic_id' => $clinicId,
+            'clinic_id' => null,
             'visit_date' => now()->toDateString(),
             'recorded_by' => auth()->id(),
         ]);
@@ -271,42 +270,72 @@ class VisitController extends Controller
             ->whereNotIn('id', $visit->visitDepartments->pluck('medical_department_id'))
             ->get();
 
-        return view('dashboard.visits.edit', compact('visit', 'medicalDepartments'));
+        $clinics = Clinic::where('is_active', true)->orderBy('name')->get();
+
+        return view('dashboard.visits.edit', compact('visit', 'medicalDepartments', 'clinics'));
     }
 
-    public function addDepartment(Request $request, Visit $visit): RedirectResponse
+    public function addDepartment(Request $request, Visit $visit): JsonResponse
     {
         $this->authorize('update', $visit);
 
         $validated = $request->validate([
             'medical_department_id' => 'required|exists:medical_departments,id',
             'amount_before_discount' => 'nullable|numeric|min:0',
+            'clinic_id' => 'nullable|exists:clinics,id',
         ]);
 
         $department = MedicalDepartment::findOrFail($validated['medical_department_id']);
+        $request->validate($department->name === 'clinics'
+            ? ['clinic_id' => 'required|exists:clinics,id']
+            : ['clinic_id' => 'prohibited']);
 
         if ($visit->visitDepartments()->where('medical_department_id', $department->id)->exists()) {
-            return redirect()->route('dashboard.visits.edit', $visit)
-                ->with('danger', 'هذا القسم مُضاف مسبقاً لهذه الزيارة.');
+            return response()->json(['message' => 'هذا القسم مُضاف مسبقاً لهذه الزيارة.'], 422);
         }
 
-        $visitDepartment = VisitDepartment::create([
-            'visit_id' => $visit->id,
-            'medical_department_id' => $department->id,
-            'applied_discount_percentage' => $department->discount_percentage,
-            'applied_max_discount_amount' => $department->max_discount_amount,
-            'amount_before_discount' => $validated['amount_before_discount'] ?? null,
-            'amount_after_discount' => null,
-            'added_at' => now(),
-            'added_by' => auth()->id(),
-        ]);
+        if ($department->name === 'clinics') {
+            $visit->loadMissing(['patientEmployee', 'patientDependent']);
+            $patientNationalId = $visit->patientEmployee?->national_id ?? $visit->patientDependent?->national_id;
+            $resolution = $this->resolvePatientVisit(
+                $patientNationalId,
+                (int) $validated['clinic_id'],
+                $visit->visit_date,
+                $visit->id
+            );
 
-        if ($visitDepartment->amount_before_discount !== null) {
-            $visitDepartment->update(['amount_after_discount' => $visitDepartment->calculateAmountAfterDiscount()]);
+            if ($resolution && $resolution['existing_visit']) {
+                return response()->json([
+                    'message' => 'توجد زيارة أخرى لهذا المريض في العيادة المحددة اليوم. يلزم فتح زيارة منفصلة عند اختيار عيادة ثانية، ولا يمكن إضافة الكشف لهذه الزيارة.',
+                ], 422);
+            }
         }
 
-        $visit->recalculateTotals();
-        $visit->update(['last_updated_by' => auth()->id()]);
+        $visitDepartment = DB::transaction(function () use ($department, $validated, $visit) {
+            $visitDepartment = VisitDepartment::create([
+                'visit_id' => $visit->id,
+                'medical_department_id' => $department->id,
+                'applied_discount_percentage' => $department->discount_percentage,
+                'applied_max_discount_amount' => $department->max_discount_amount,
+                'amount_before_discount' => $validated['amount_before_discount'] ?? null,
+                'amount_after_discount' => null,
+                'added_at' => now(),
+                'added_by' => auth()->id(),
+            ]);
+
+            if ($visitDepartment->amount_before_discount !== null) {
+                $visitDepartment->update(['amount_after_discount' => $visitDepartment->calculateAmountAfterDiscount()]);
+            }
+
+            if ($department->name === 'clinics') {
+                $visit->update(['clinic_id' => $validated['clinic_id']]);
+            }
+
+            $visit->recalculateTotals();
+            $visit->update(['last_updated_by' => auth()->id()]);
+
+            return $visitDepartment;
+        });
 
         ActivityLogService::log(
             'Updated',
@@ -316,10 +345,10 @@ class VisitController extends Controller
             $visitDepartment->toArray()
         );
 
-        return redirect()->route('dashboard.visits.edit', $visit)->with('success', 'تم إضافة القسم للزيارة.');
+        return response()->json($this->visitPayload($visit, 'تم إضافة القسم للزيارة.'));
     }
 
-    public function updateDepartmentAmount(Request $request, Visit $visit, VisitDepartment $visitDepartment): RedirectResponse
+    public function updateDepartmentAmount(Request $request, Visit $visit, VisitDepartment $visitDepartment): JsonResponse
     {
         $this->authorize('update', $visit);
         abort_unless($visitDepartment->visit_id === $visit->id, 404);
@@ -344,7 +373,105 @@ class VisitController extends Controller
             $visitDepartment->getChanges()
         );
 
-        return redirect()->route('dashboard.visits.edit', $visit)->with('success', 'تم تعديل المبلغ.');
+        return response()->json($this->visitPayload($visit, 'تم تعديل المبلغ.'));
+    }
+
+    public function removeDepartment(Visit $visit, VisitDepartment $visitDepartment): JsonResponse
+    {
+        $this->authorize('update', $visit);
+        abort_unless($visitDepartment->visit_id === $visit->id, 404);
+
+        $visitDepartment->load('medicalDepartment');
+        $departmentName = $visitDepartment->medicalDepartment->name;
+        $old = $visitDepartment->toArray();
+
+        DB::transaction(function () use ($visit, $visitDepartment, $departmentName) {
+            $visitDepartment->delete();
+
+            if ($departmentName === 'clinics' && ! $visit->visitDepartments()
+                ->whereHas('medicalDepartment', fn ($query) => $query->where('name', 'clinics'))
+                ->exists()) {
+                $visit->update(['clinic_id' => null]);
+            }
+
+            $visit->recalculateTotals();
+            $visit->update(['last_updated_by' => auth()->id()]);
+        });
+
+        ActivityLogService::log(
+            'Updated',
+            'Visit',
+            "تم حذف قسم {$departmentName} من زيارة #{$visit->id}.",
+            $old,
+            null
+        );
+
+        return response()->json($this->visitPayload($visit, 'تم حذف القسم من الزيارة.'));
+    }
+
+    private function resolvePatientVisit(
+        string $nationalId,
+        ?int $clinicId = null,
+        mixed $visitDate = null,
+        ?int $excludeVisitId = null
+    ): ?array {
+        $employee = Employee::where('national_id', $nationalId)->first();
+        $dependent = $employee ? null : Dependent::with('employee')->where('national_id', $nationalId)->first();
+
+        if (! $employee && ! $dependent) {
+            return null;
+        }
+
+        $quotaOwner = $employee ?? $dependent->employee;
+        $existingVisit = Visit::query()
+            ->when($employee, fn ($query) => $query->where('patient_employee_id', $employee->id))
+            ->when($dependent, fn ($query) => $query->where('patient_dependent_id', $dependent->id))
+            ->whereDate('visit_date', $visitDate ?? now()->toDateString())
+            ->when(
+                $clinicId === null,
+                fn ($query) => $query->whereNull('clinic_id'),
+                fn ($query) => $query->where('clinic_id', $clinicId)
+            )
+            ->when($excludeVisitId, fn ($query) => $query->whereKeyNot($excludeVisitId))
+            ->first();
+
+        return [
+            'employee' => $employee,
+            'dependent' => $dependent,
+            'quota_owner' => $quotaOwner,
+            'remaining_quota' => $quotaOwner->remainingQuota(),
+            'existing_visit' => $existingVisit,
+        ];
+    }
+
+    private function visitPayload(Visit $visit, string $message): array
+    {
+        $visit->refresh()->load(['clinic', 'visitDepartments.medicalDepartment']);
+
+        return [
+            'message' => $message,
+            'visit' => [
+                'id' => $visit->id,
+                'clinic_id' => $visit->clinic_id,
+                'clinic_name' => $visit->clinic?->name ?? 'بدون عيادة',
+                'total_before_discount' => $visit->total_before_discount,
+                'total_after_discount' => $visit->total_after_discount,
+            ],
+            'departments' => $visit->visitDepartments->map(fn (VisitDepartment $visitDepartment) => [
+                'id' => $visitDepartment->id,
+                'name' => $visitDepartment->medicalDepartment->name,
+                'applied_discount_percentage' => $visitDepartment->applied_discount_percentage,
+                'amount_before_discount' => $visitDepartment->amount_before_discount,
+                'amount_after_discount' => $visitDepartment->amount_after_discount,
+                'update_url' => route('dashboard.visits.departments.update-amount', [$visit, $visitDepartment]),
+                'delete_url' => route('dashboard.visits.departments.destroy', [$visit, $visitDepartment]),
+            ])->values(),
+            'available_departments' => MedicalDepartment::query()
+                ->where('is_active', true)
+                ->whereNotIn('id', $visit->visitDepartments->pluck('medical_department_id'))
+                ->get(['id', 'name'])
+                ->values(),
+        ];
     }
 
     public function destroy(Visit $visit): RedirectResponse

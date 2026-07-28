@@ -60,6 +60,7 @@ Route::group([
     Route::delete('visits/{visit}', [VisitController::class, 'destroy'])->name('visits.destroy');
     Route::post('visits/{visit}/departments', [VisitController::class, 'addDepartment'])->name('visits.departments.store');
     Route::put('visits/{visit}/departments/{visitDepartment}', [VisitController::class, 'updateDepartmentAmount'])->name('visits.departments.update-amount');
+    Route::delete('visits/{visit}/departments/{visitDepartment}', [VisitController::class, 'removeDepartment'])->name('visits.departments.destroy');
 
     Route::get('survey-submissions', [SurveySubmissionController::class, 'index'])->name('survey-submissions.index');
     Route::get('survey-submissions-filters/{column}', [SurveySubmissionController::class, 'getFilterOptions'])->name('survey-submissions.filters');
