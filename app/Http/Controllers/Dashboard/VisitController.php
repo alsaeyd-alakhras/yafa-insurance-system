@@ -37,6 +37,7 @@ class VisitController extends Controller
             $this->applySort($query, $request);
 
             return DataTables::of($query)
+                ->addIndexColumn()
                 ->addColumn('patient_name', fn (Visit $visit) => $visit->patientEmployee?->full_name ?? $visit->patientDependent?->full_name ?? '-')
                 ->addColumn('employee_name', fn (Visit $visit) => $visit->employee?->full_name ?? '-')
                 ->addColumn('clinic_name', fn (Visit $visit) => $visit->clinic?->name ?? '-')
