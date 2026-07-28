@@ -11,8 +11,10 @@
         <style>
             :root {
                 --sticky-col1-width: 60px;
-                --sticky-col2-width: 90px;
+                --sticky-col2-width: 70px;
+                --sticky-col3-width: 70px;
                 --sticky-col2-right: var(--sticky-col1-width);
+                --sticky-col3-right: calc(var(--sticky-col1-width) + var(--sticky-col2-width));
             }
 
             th.enhanced-sticky:nth-child(1), td.enhanced-sticky:nth-child(1) {
@@ -27,11 +29,68 @@
                 min-width: var(--sticky-col2-width);
             }
 
+            th.enhanced-sticky:nth-child(3), td.enhanced-sticky:nth-child(3) {
+                right: var(--sticky-col3-right);
+                width: var(--sticky-col3-width);
+                min-width: var(--sticky-col3-width);
+            }
+
             #patient-search-results .patient-choice { cursor: pointer; }
             #patient-search-results .family-card { border-color: #e3e7ed; }
             #patient-search-results .family-header { background: #f7f9fb; }
             #visits-table td.amount-column { direction: ltr; font-variant-numeric: tabular-nums; white-space: nowrap; }
             #visits-table td { vertical-align: middle; padding-top: .7rem; padding-bottom: .7rem; }
+
+            #visitDetailsModal .modal-body { max-height: 75vh; }
+
+            .visit-detail-summary {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 14px;
+                background: rgba(67, 89, 113, .02);
+                border: 1px solid rgba(67, 89, 113, .12);
+                border-radius: .5rem;
+                padding: 1rem 1.25rem;
+            }
+
+            .visit-detail-summary > div { display: flex; flex-direction: column; gap: .15rem; }
+            .visit-detail-summary strong { font-size: .75rem; color: #8592a3; font-weight: 600; }
+
+            .visit-detail-section {
+                margin-top: 1.5rem;
+                border: 1px solid rgba(67, 89, 113, .16);
+                border-right: 4px solid #696cff;
+                border-radius: .5rem;
+                overflow: hidden;
+            }
+
+            .visit-detail-section h6 { margin: 0; padding: .65rem 1rem; background: rgba(67, 89, 113, .04); font-weight: 600; }
+            .visit-detail-section .table-responsive {
+                height: auto !important;
+                border-radius: 0;
+                box-shadow: none;
+                border: 0;
+                overflow-x: auto;
+            }
+
+            #visitDetailsModal .visit-department-table { margin-bottom: 0; --bs-table-bg: transparent; }
+            #visitDetailsModal .visit-department-table > :not(caption) > * > * {
+                padding: .75rem 1rem !important;
+                vertical-align: middle;
+                white-space: nowrap;
+                border-bottom: 0;
+            }
+            #visitDetailsModal .visit-department-table > thead > tr > th {
+                background: #fff;
+                border-bottom: 1px solid rgba(67, 89, 113, .16) !important;
+                font-size: .75rem;
+            }
+            #visitDetailsModal .visit-department-table > tbody > tr:not(:last-child) > td {
+                border-bottom: 1px solid rgba(67, 89, 113, .08) !important;
+            }
+            #visitDetailsModal .visit-department-table > tbody > tr:nth-of-type(odd) > td {
+                background: rgba(67, 89, 113, .015);
+            }
         </style>
     @endpush
 
@@ -71,6 +130,7 @@
 
     @php
         $fields = [
+            'view' => 'عرض',
             'edit' => 'تعديل',
             'visit_date' => 'التاريخ',
             'patient_name' => 'المريض',
@@ -81,7 +141,7 @@
             'total_after_discount' => 'المبلغ بعد الخصم',
             'recorded_by_name' => 'مسجّل الزيارة',
         ];
-        $filterableFields = ['patient_name', 'employee_name', 'clinic_name'];
+        $filterableFields = ['patient_name', 'employee_name', 'clinic_name', 'departments_list', 'recorded_by_name'];
         $sortableFields = ['visit_date'];
     @endphp
 
@@ -94,7 +154,7 @@
                             <tr>
                                 <th class="text-center enhanced-sticky">#</th>
                                 @foreach ($fields as $index => $label)
-                                    <th class="{{ $loop->index < 1 ? 'enhanced-sticky' : '' }}">
+                                    <th class="{{ $loop->index < 2 ? 'enhanced-sticky' : '' }}">
                                         <div class="d-flex align-items-center justify-content-between">
                                             <span>{{ $label }}</span>
                                             <div class="enhanced-filter-dropdown d-flex align-items-center gap-1">
@@ -207,7 +267,23 @@
     <form id="create-visit-form" action="{{ route('dashboard.visits.store') }}" method="post" class="d-none">
         @csrf
         <input type="hidden" name="national_id" id="create-visit-national-id">
+        <input type="hidden" name="force_new" id="create-visit-force-new" value="0">
     </form>
+
+    {{-- Modal: عرض تفاصيل الزيارة --}}
+    <div class="modal fade" id="visitDetailsModal" tabindex="-1" aria-labelledby="visitDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="visitDetailsModalLabel">تفاصيل الزيارة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="visitDetailsBody">
+                    <div class="text-center text-muted py-4">جاري التحميل...</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <x-confirm-modal />
 
@@ -223,13 +299,20 @@
 
             const urlIndex = `{{ route('dashboard.visits.index') }}`;
             const urlFilters = `{{ route('dashboard.visits.filters', ':column') }}`;
+            const urlShow = `{{ route('dashboard.visits.show', ':id') }}`;
             const urlEdit = `{{ route('dashboard.visits.edit', ':id') }}`;
             const urlDelete = `{{ route('dashboard.visits.destroy', ':id') }}`;
 
-            const fields = ['#', 'edit', 'visit_date', 'patient_name', 'employee_name', 'clinic_name', 'departments_list', 'total_before_discount', 'total_after_discount', 'recorded_by_name', 'delete'];
+            const fields = ['#', 'view', 'edit', 'visit_date', 'patient_name', 'employee_name', 'clinic_name', 'departments_list', 'total_before_discount', 'total_after_discount', 'recorded_by_name', 'delete'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
+                {
+                    data: 'edit', name: 'view', orderable: false, searchable: false, class: 'enhanced-sticky text-center',
+                    render: function (data) {
+                        return `<button type="button" class="action-btn btn-view btn-visit-details" data-id="${data}" title="عرض التفاصيل"><i class="fas fa-eye"></i></button>`;
+                    },
+                },
                 {
                     data: 'edit', name: 'edit', orderable: false, searchable: false, class: 'enhanced-sticky',
                     render: function (data) {
@@ -289,9 +372,13 @@
                     success: function (response) {
                         if (response.redirect) {
                             $result.html(`
-                                <div class="alert alert-info mb-0">
-                                    توجد زيارة اليوم لهذا المريض.
-                                    <a class="btn btn-sm btn-primary ms-3" href="${response.redirect}">فتح الزيارة</a>
+                                <div class="alert alert-info mb-2">
+                                    هذا المريض عنده زيارة مسجّلة اليوم بدون عيادة محددة.
+                                    <a class="btn btn-sm btn-primary ms-3" href="${response.redirect}">فتح الزيارة الموجودة</a>
+                                </div>
+                                <div class="alert alert-secondary mb-0">
+                                    محتاج كشف طبي بعيادة تانية بنفس اليوم؟ هذه تُعتبر زيارة منفصلة كليًا حسب سياسة العيادات.
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-3" id="btn-create-separate-visit">بدء زيارة كشف طبي منفصلة</button>
                                 </div>
                             `);
                             return;
@@ -404,11 +491,93 @@
             $(document).on('click', '#btn-create-visit', function () {
                 if (!selectedPatient) return;
                 $('#create-visit-national-id').val(selectedPatient.national_id);
+                $('#create-visit-force-new').val('0');
+                $('#create-visit-form').trigger('submit');
+            });
+
+            $(document).on('click', '#btn-create-separate-visit', function () {
+                if (!selectedPatient) return;
+                $('#create-visit-national-id').val(selectedPatient.national_id);
+                $('#create-visit-force-new').val('1');
                 $('#create-visit-form').trigger('submit');
             });
 
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
                 new bootstrap.Tooltip(element);
+            });
+
+            function visitDepartmentRows(departments) {
+                if (!departments.length) {
+                    return '<tr><td colspan="4" class="text-center text-muted">لا توجد أقسام مضافة</td></tr>';
+                }
+
+                return departments.map(function (department) {
+                    return `
+                        <tr>
+                            <td>${escapeHtml(department.name || '-')}</td>
+                            <td class="text-center">${escapeHtml(department.discount_percentage || '0')}%</td>
+                            <td class="text-center">${escapeHtml(department.amount_before_discount ?? '-')}</td>
+                            <td class="text-center">${escapeHtml(department.amount_after_discount ?? '-')}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            function renderVisitDetailsModal(visit) {
+                const editButton = visit.can_update
+                    ? `<a href="${visit.edit_url}" class="btn btn-primary"><i class="fa-solid fa-pen-to-square me-1"></i> تعديل الزيارة</a>`
+                    : '';
+
+                return `
+                    <div class="visit-detail-summary">
+                        <div><strong>المريض</strong><span>${escapeHtml(visit.patient_name || '-')} (${escapeHtml(visit.patient_type || '-')})</span></div>
+                        <div><strong>الموظف صاحب الرصيد</strong><span>${escapeHtml(visit.employee_name || '-')}</span></div>
+                        <div><strong>العيادة</strong><span>${escapeHtml(visit.clinic_name || '-')}</span></div>
+                        <div><strong>تاريخ الزيارة</strong><span>${escapeHtml(visit.visit_date || '-')}</span></div>
+                        <div><strong>مسجّل الزيارة</strong><span>${escapeHtml(visit.recorded_by_name || '-')}</span></div>
+                        <div><strong>الإجمالي قبل الخصم</strong><span>${visit.total_before_discount !== null ? escapeHtml(visit.total_before_discount) + ' ₪' : '-'}</span></div>
+                        <div><strong>الإجمالي بعد الخصم</strong><span>${visit.total_after_discount !== null ? escapeHtml(visit.total_after_discount) + ' ₪' : '-'}</span></div>
+                    </div>
+                    <div class="visit-detail-section">
+                        <h6>الأقسام المضافة</h6>
+                        <div class="table-responsive">
+                            <table class="table visit-department-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>القسم</th>
+                                        <th class="text-center">النسبة</th>
+                                        <th class="text-center">المبلغ الأساسي</th>
+                                        <th class="text-center">المبلغ بعد الخصم</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${visitDepartmentRows(visit.departments || [])}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    ${editButton ? `<div class="d-flex justify-content-end mt-3">${editButton}</div>` : ''}
+                `;
+            }
+
+            $(document).on('click', '.btn-visit-details', function () {
+                const id = $(this).data('id');
+                const $body = $('#visitDetailsBody');
+                $body.html('<div class="text-center text-muted py-4">جاري التحميل...</div>');
+                $('#visitDetailsModal').modal('show');
+
+                $.ajax({
+                    url: urlShow.replace(':id', id),
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    success: function (response) {
+                        $body.html(renderVisitDetailsModal(response));
+                    },
+                    error: function () {
+                        $body.html('<div class="alert alert-danger mb-0">تعذر تحميل تفاصيل الزيارة.</div>');
+                    },
+                });
             });
         </script>
     @endpush

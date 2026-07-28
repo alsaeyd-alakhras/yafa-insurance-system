@@ -56,6 +56,7 @@ Route::group([
     Route::get('visits/search-patients', [VisitController::class, 'searchPatients'])->name('visits.search-patients');
     Route::get('visits/search', [VisitController::class, 'search'])->name('visits.search');
     Route::post('visits', [VisitController::class, 'store'])->name('visits.store');
+    Route::get('visits/{visit}', [VisitController::class, 'show'])->name('visits.show');
     Route::get('visits/{visit}/edit', [VisitController::class, 'edit'])->name('visits.edit');
     Route::delete('visits/{visit}', [VisitController::class, 'destroy'])->name('visits.destroy');
     Route::post('visits/{visit}/departments', [VisitController::class, 'addDepartment'])->name('visits.departments.store');

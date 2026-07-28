@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\Dependent;
 use App\Models\Employee;
 use App\Models\MedicalDepartment;
+use App\Models\User;
 use App\Models\Visit;
 use App\Models\VisitDepartment;
 use App\Services\ActivityLogService;
@@ -20,7 +21,17 @@ use Yajra\DataTables\Facades\DataTables;
 class VisitController extends Controller
 {
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['patient_name', 'employee_name', 'clinic_name'];
+    private const FILTERABLE_COLUMNS = ['patient_name', 'employee_name', 'clinic_name', 'departments_list', 'recorded_by_name'];
+
+    /** Arabic labels for the fixed medical department slugs. */
+    private const DEPARTMENT_LABELS = [
+        'clinics' => 'الكشف الطبي',
+        'pharmacy' => 'الصيدلية',
+        'laboratory' => 'المختبر',
+        'optics' => 'البصريات',
+        'dental' => 'الأسنان',
+        'radiology' => 'الأشعة',
+    ];
 
     public function index(Request $request)
     {
@@ -41,7 +52,7 @@ class VisitController extends Controller
                 ->addColumn('patient_name', fn (Visit $visit) => $visit->patientEmployee?->full_name ?? $visit->patientDependent?->full_name ?? '-')
                 ->addColumn('employee_name', fn (Visit $visit) => $visit->employee?->full_name ?? '-')
                 ->addColumn('clinic_name', fn (Visit $visit) => $visit->clinic?->name ?? '-')
-                ->addColumn('departments_list', fn (Visit $visit) => $visit->visitDepartments->pluck('medicalDepartment.name')->filter()->implode('، ') ?: '-')
+                ->addColumn('departments_list', fn (Visit $visit) => $visit->visitDepartments->pluck('medicalDepartment.name')->filter()->map(fn ($name) => self::DEPARTMENT_LABELS[$name] ?? $name)->implode('، ') ?: '-')
                 ->addColumn('total_before_discount', fn (Visit $visit) => $visit->total_before_discount !== null ? number_format((float) $visit->total_before_discount, 2) : '-')
                 ->addColumn('total_after_discount', fn (Visit $visit) => $visit->total_after_discount !== null ? number_format((float) $visit->total_after_discount, 2) : '-')
                 ->addColumn('recorded_by_name', fn (Visit $visit) => $visit->recordedBy?->name ?? '-')
@@ -90,6 +101,16 @@ class VisitController extends Controller
             if ($column === 'employee_name') {
                 $query->whereHas('employee', fn ($q) => $q->whereIn('full_name', (array) $values));
             }
+
+            if ($column === 'departments_list') {
+                $labelToName = array_flip(self::DEPARTMENT_LABELS);
+                $names = collect((array) $values)->map(fn ($label) => $labelToName[$label] ?? $label);
+                $query->whereHas('visitDepartments.medicalDepartment', fn ($q) => $q->whereIn('name', $names));
+            }
+
+            if ($column === 'recorded_by_name') {
+                $query->whereHas('recordedBy', fn ($q) => $q->whereIn('name', (array) $values));
+            }
         }
 
         return $hasDateFilter;
@@ -120,6 +141,15 @@ class VisitController extends Controller
                 ->unique()
                 ->values(),
             'employee_name' => Employee::query()->whereHas('visits')->distinct()->pluck('full_name'),
+            'departments_list' => MedicalDepartment::query()
+                ->whereIn('id', VisitDepartment::query()->distinct()->pluck('medical_department_id'))
+                ->pluck('name')
+                ->map(fn ($name) => self::DEPARTMENT_LABELS[$name] ?? $name)
+                ->unique()
+                ->values(),
+            'recorded_by_name' => User::query()
+                ->whereIn('id', Visit::query()->whereNotNull('recorded_by')->distinct()->pluck('recorded_by'))
+                ->pluck('name'),
             default => collect(),
         };
 
@@ -219,7 +249,10 @@ class VisitController extends Controller
 
         $validated = $request->validate([
             'national_id' => 'required|string|size:9',
+            'force_new' => 'nullable|boolean',
         ]);
+
+        $forceNew = (bool) ($validated['force_new'] ?? false);
 
         $resolution = $this->resolvePatientVisit($validated['national_id']);
 
@@ -229,7 +262,7 @@ class VisitController extends Controller
         $dependent = $resolution['dependent'];
         $quotaOwner = $resolution['quota_owner'];
 
-        if ($resolution['existing_visit']) {
+        if ($resolution['existing_visit'] && ! $forceNew) {
             return redirect()->route('dashboard.visits.edit', $resolution['existing_visit'])
                 ->with('info', 'توجد زيارة مسجّلة لهذا المريض اليوم — تمت إضافتك لها.');
         }
@@ -259,6 +292,33 @@ class VisitController extends Controller
         );
 
         return redirect()->route('dashboard.visits.edit', $visit)->with('success', 'تم تسجيل الزيارة.');
+    }
+
+    public function show(Visit $visit): JsonResponse
+    {
+        $this->authorize('view', $visit);
+
+        $visit->load(['patientEmployee', 'patientDependent', 'employee', 'clinic', 'recordedBy', 'visitDepartments.medicalDepartment']);
+
+        return response()->json([
+            'id' => $visit->id,
+            'patient_name' => $visit->patientEmployee?->full_name ?? $visit->patientDependent?->full_name ?? '-',
+            'patient_type' => $visit->patient_employee_id ? 'موظف' : 'تابع',
+            'employee_name' => $visit->employee?->full_name ?? '-',
+            'clinic_name' => $visit->clinic?->name ?? 'بدون عيادة',
+            'visit_date' => $visit->visit_date,
+            'recorded_by_name' => $visit->recordedBy?->name ?? '-',
+            'total_before_discount' => $visit->total_before_discount !== null ? number_format((float) $visit->total_before_discount, 2) : null,
+            'total_after_discount' => $visit->total_after_discount !== null ? number_format((float) $visit->total_after_discount, 2) : null,
+            'departments' => $visit->visitDepartments->map(fn (VisitDepartment $vd) => [
+                'name' => self::DEPARTMENT_LABELS[$vd->medicalDepartment->name] ?? $vd->medicalDepartment->name,
+                'discount_percentage' => rtrim(rtrim(number_format($vd->applied_discount_percentage, 2), '0'), '.'),
+                'amount_before_discount' => $vd->amount_before_discount !== null ? number_format($vd->amount_before_discount, 2) : null,
+                'amount_after_discount' => $vd->amount_after_discount !== null ? number_format($vd->amount_after_discount, 2) : null,
+            ])->values(),
+            'can_update' => auth()->user()->can('update', $visit),
+            'edit_url' => route('dashboard.visits.edit', $visit),
+        ]);
     }
 
     public function edit(Visit $visit): View
