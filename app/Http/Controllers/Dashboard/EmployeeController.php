@@ -33,7 +33,7 @@ class EmployeeController extends Controller
     ];
 
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['gender', 'marital_status', 'status', 'organization_unit_name'];
+    private const FILTERABLE_COLUMNS = ['gender', 'marital_status', 'status', 'organization_unit_name', 'organization_center', 'organization_department'];
 
     public function index(Request $request)
     {
@@ -83,6 +83,18 @@ class EmployeeController extends Controller
                 continue;
             }
 
+            if ($column === 'organization_center') {
+                $sectionIds = $this->sectionIdsUnderAncestors(1, (array) $values);
+                $query->whereIn('organization_unit_id', $sectionIds);
+                continue;
+            }
+
+            if ($column === 'organization_department') {
+                $sectionIds = $this->sectionIdsUnderAncestors(2, (array) $values);
+                $query->whereIn('organization_unit_id', $sectionIds);
+                continue;
+            }
+
             $query->whereIn($column, (array) $values);
         }
     }
@@ -99,6 +111,35 @@ class EmployeeController extends Controller
         $query->orderBy($sortColumn, $sortDirection === 'desc' ? 'desc' : 'asc');
     }
 
+    /**
+     * Resolve level-3 (section) organization unit ids that fall under any level-1/level-2
+     * ancestor unit matching the given names, for filtering employees by center/department.
+     *
+     * @return array<int>
+     */
+    private function sectionIdsUnderAncestors(int $ancestorLevel, array $ancestorNames): array
+    {
+        $ancestorIds = OrganizationUnit::where('level', $ancestorLevel)
+            ->whereIn('name', $ancestorNames)
+            ->pluck('id');
+
+        if ($ancestorIds->isEmpty()) {
+            return [];
+        }
+
+        return match ($ancestorLevel) {
+            1 => OrganizationUnit::where('level', 3)
+                ->whereHas('parent', fn ($q) => $q->whereIn('parent_id', $ancestorIds))
+                ->pluck('id')
+                ->all(),
+            2 => OrganizationUnit::where('level', 3)
+                ->whereIn('parent_id', $ancestorIds)
+                ->pluck('id')
+                ->all(),
+            default => [],
+        };
+    }
+
     public function getFilterOptions(string $column): JsonResponse
     {
         $this->authorize('view', Employee::class);
@@ -108,6 +149,19 @@ class EmployeeController extends Controller
         if ($column === 'organization_unit_name') {
             $values = OrganizationUnit::query()
                 ->whereHas('employees')
+                ->distinct()
+                ->pluck('name');
+
+            return response()->json($values);
+        }
+
+        if (in_array($column, ['organization_center', 'organization_department'], true)) {
+            $level = $column === 'organization_center' ? 1 : 2;
+            $sectionIds = Employee::query()->distinct()->pluck('organization_unit_id');
+
+            $values = OrganizationUnit::where('level', $level)
+                ->when($level === 1, fn ($q) => $q->whereHas('children.children', fn ($qq) => $qq->whereIn('id', $sectionIds)))
+                ->when($level === 2, fn ($q) => $q->whereHas('children', fn ($qq) => $qq->whereIn('id', $sectionIds)))
                 ->distinct()
                 ->pluck('name');
 

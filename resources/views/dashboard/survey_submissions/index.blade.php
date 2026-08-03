@@ -149,10 +149,13 @@
             'national_id' => 'رقم الهوية',
             'gender' => 'الجنس',
             'marital_status' => 'الحالة الزوجية',
+            'organization_center' => 'مركزية',
+            'organization_department' => 'دائرة',
+            'organization_unit_name' => 'قسم',
             'status' => 'الحالة',
             'created_at' => 'تاريخ التقديم',
         ];
-        $filterableFields = ['gender', 'marital_status', 'status'];
+        $filterableFields = ['gender', 'marital_status', 'status', 'organization_center', 'organization_department', 'organization_unit_name'];
         $sortableFields = ['national_id', 'created_at'];
     @endphp
 
@@ -296,7 +299,7 @@
                 divorced: 'مطلق/ة',
             };
 
-            const fields = ['#', 'view', 'full_name', 'national_id', 'gender', 'marital_status', 'status', 'created_at'];
+            const fields = ['#', 'view', 'full_name', 'national_id', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_unit_name', 'status', 'created_at'];
 
             function renderStatusBadge(status, label) {
                 const classes = {
@@ -331,6 +334,9 @@
                     data: 'marital_status', name: 'marital_status', orderable: false, searchable: false, class: 'text-center',
                     render: function (data) { return maritalLabels[data] || data || '-'; },
                 },
+                { data: 'organization_center', name: 'organization_center', orderable: false, searchable: false },
+                { data: 'organization_department', name: 'organization_department', orderable: false, searchable: false },
+                { data: 'organization_unit_name', name: 'organization_unit_name', orderable: false, searchable: false },
                 {
                     data: 'status', name: 'status', orderable: false, searchable: false, class: 'text-center',
                     render: function (data) { return renderStatusBadge(data); },

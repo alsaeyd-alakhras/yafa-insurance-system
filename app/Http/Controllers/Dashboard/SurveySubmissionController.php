@@ -44,7 +44,7 @@ class SurveySubmissionController extends Controller
     ];
 
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['status', 'gender', 'marital_status'];
+    private const FILTERABLE_COLUMNS = ['status', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_unit_name'];
 
     public function __construct(private SurveyWindowService $surveyWindow)
     {
@@ -63,11 +63,26 @@ class SurveySubmissionController extends Controller
                 $query->orderByDesc('created_at');
             }
 
+            $organizationUnits = OrganizationUnit::all()->keyBy('id');
+
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('full_name', fn (SurveySubmission $submission) => $submission->raw_data['full_name'] ?? '-')
                 ->addColumn('gender', fn (SurveySubmission $submission) => $submission->raw_data['gender'] ?? null)
                 ->addColumn('marital_status', fn (SurveySubmission $submission) => $submission->raw_data['marital_status'] ?? null)
+                ->addColumn('organization_center', function (SurveySubmission $submission) use ($organizationUnits) {
+                    $unit = $organizationUnits->get($submission->raw_data['organization_unit_id'] ?? null);
+
+                    return $unit?->ancestryChain()['center']?->name ?? '-';
+                })
+                ->addColumn('organization_department', function (SurveySubmission $submission) use ($organizationUnits) {
+                    $unit = $organizationUnits->get($submission->raw_data['organization_unit_id'] ?? null);
+
+                    return $unit?->ancestryChain()['department']?->name ?? '-';
+                })
+                ->addColumn('organization_unit_name', function (SurveySubmission $submission) use ($organizationUnits) {
+                    return $organizationUnits->get($submission->raw_data['organization_unit_id'] ?? null)?->name ?? '-';
+                })
                 ->addColumn('created_at_formatted', fn (SurveySubmission $submission) => $submission->created_at?->format('Y-m-d H:i') ?? '-')
                 ->addColumn('view', fn (SurveySubmission $submission) => $submission->id)
                 ->rawColumns(['view'])
@@ -90,15 +105,60 @@ class SurveySubmissionController extends Controller
                 continue;
             }
 
-            $values = $this->normalizeFilterValues($column, (array) $values);
-
             if ($column === 'status') {
+                $values = $this->normalizeFilterValues($column, (array) $values);
                 $query->whereIn('status', $values);
                 continue;
             }
 
+            if ($column === 'organization_center') {
+                $query->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.organization_unit_id'))"), $this->unitIdsUnderAncestors(1, (array) $values));
+                continue;
+            }
+
+            if ($column === 'organization_department') {
+                $query->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.organization_unit_id'))"), $this->unitIdsUnderAncestors(2, (array) $values));
+                continue;
+            }
+
+            if ($column === 'organization_unit_name') {
+                $unitIds = OrganizationUnit::where('level', 3)->whereIn('name', (array) $values)->pluck('id');
+                $query->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.organization_unit_id'))"), $unitIds);
+                continue;
+            }
+
+            $values = $this->normalizeFilterValues($column, (array) $values);
             $query->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.{$column}'))"), $values);
         }
+    }
+
+    /**
+     * Resolve level-3 (section) organization unit ids that fall under any level-1/level-2
+     * ancestor unit matching the given names, for filtering survey submissions by center/department.
+     *
+     * @return array<int>
+     */
+    private function unitIdsUnderAncestors(int $ancestorLevel, array $ancestorNames): array
+    {
+        $ancestorIds = OrganizationUnit::where('level', $ancestorLevel)
+            ->whereIn('name', $ancestorNames)
+            ->pluck('id');
+
+        if ($ancestorIds->isEmpty()) {
+            return [];
+        }
+
+        return match ($ancestorLevel) {
+            1 => OrganizationUnit::where('level', 3)
+                ->whereHas('parent', fn ($q) => $q->whereIn('parent_id', $ancestorIds))
+                ->pluck('id')
+                ->all(),
+            2 => OrganizationUnit::where('level', 3)
+                ->whereIn('parent_id', $ancestorIds)
+                ->pluck('id')
+                ->all(),
+            default => [],
+        };
     }
 
     private function applySort($query, Request $request): void
@@ -123,6 +183,31 @@ class SurveySubmissionController extends Controller
             $values = SurveySubmission::query()->distinct()->pluck('status')->filter()->values();
 
             return response()->json($values->map(fn ($value) => self::STATUS_LABELS[$value] ?? $value));
+        }
+
+        if (in_array($column, ['organization_center', 'organization_department', 'organization_unit_name'], true)) {
+            $unitIds = SurveySubmission::query()
+                ->select(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.organization_unit_id')) as unit_id"))
+                ->distinct()
+                ->pluck('unit_id')
+                ->filter()
+                ->values();
+
+            $level = match ($column) {
+                'organization_center' => 1,
+                'organization_department' => 2,
+                default => 3,
+            };
+
+            $values = OrganizationUnit::where('level', 3)
+                ->whereIn('id', $unitIds)
+                ->get()
+                ->map(fn (OrganizationUnit $unit) => $level === 3 ? $unit->name : ($unit->ancestryChain()[$level === 1 ? 'center' : 'department']?->name))
+                ->filter()
+                ->unique()
+                ->values();
+
+            return response()->json($values);
         }
 
         $labels = $column === 'gender' ? self::GENDER_LABELS : self::MARITAL_STATUS_LABELS;
