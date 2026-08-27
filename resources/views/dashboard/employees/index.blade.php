@@ -88,7 +88,7 @@
             'dependents_count' => 'عدد التابعين',
             'status' => 'الحالة',
         ];
-        $filterableFields = ['gender', 'marital_status', 'status', 'organization_unit_name', 'organization_center', 'organization_department'];
+        $filterableFields = ['full_name', 'national_id', 'gender', 'marital_status', 'status', 'organization_unit_name', 'organization_center', 'organization_department', 'dependents_count'];
         $sortableFields = ['full_name', 'national_id', 'gender', 'marital_status', 'status'];
     @endphp
 

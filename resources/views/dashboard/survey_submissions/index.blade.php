@@ -155,7 +155,7 @@
             'status' => 'الحالة',
             'created_at' => 'تاريخ التقديم',
         ];
-        $filterableFields = ['gender', 'marital_status', 'status', 'organization_center', 'organization_department', 'organization_unit_name'];
+        $filterableFields = ['full_name', 'national_id', 'gender', 'marital_status', 'status', 'organization_center', 'organization_department', 'organization_unit_name', 'created_at'];
         $sortableFields = ['national_id', 'created_at'];
     @endphp
 

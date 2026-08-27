@@ -33,7 +33,7 @@ class EmployeeController extends Controller
     ];
 
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['gender', 'marital_status', 'status', 'organization_unit_name', 'organization_center', 'organization_department'];
+    private const FILTERABLE_COLUMNS = ['full_name', 'national_id', 'gender', 'marital_status', 'status', 'organization_unit_name', 'organization_center', 'organization_department', 'dependents_count'];
 
     public function index(Request $request)
     {
@@ -92,6 +92,11 @@ class EmployeeController extends Controller
             if ($column === 'organization_department') {
                 $sectionIds = $this->sectionIdsUnderAncestors(2, (array) $values);
                 $query->whereIn('organization_unit_id', $sectionIds);
+                continue;
+            }
+
+            if ($column === 'dependents_count') {
+                $query->havingRaw('dependents_count in ('.implode(',', array_fill(0, count((array) $values), '?')).')', (array) $values);
                 continue;
             }
 
@@ -164,6 +169,13 @@ class EmployeeController extends Controller
                 ->when($level === 2, fn ($q) => $q->whereHas('children', fn ($qq) => $qq->whereIn('id', $sectionIds)))
                 ->distinct()
                 ->pluck('name');
+
+            return response()->json($values);
+        }
+
+        if ($column === 'dependents_count') {
+            $values = Employee::query()->withCount('dependents')->get()
+                ->pluck('dependents_count')->unique()->sort()->values();
 
             return response()->json($values);
         }

@@ -44,7 +44,7 @@ class SurveySubmissionController extends Controller
     ];
 
     /** Columns filterable via the header dropdown checkbox-list. */
-    private const FILTERABLE_COLUMNS = ['status', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_unit_name'];
+    private const FILTERABLE_COLUMNS = ['full_name', 'national_id', 'status', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_unit_name', 'created_at'];
 
     public function __construct(private SurveyWindowService $surveyWindow)
     {
@@ -127,6 +127,15 @@ class SurveySubmissionController extends Controller
                 continue;
             }
 
+            if ($column === 'created_at') {
+                $query->where(function ($q) use ($values) {
+                    foreach ((array) $values as $value) {
+                        $q->orWhereDate('created_at', $value);
+                    }
+                });
+                continue;
+            }
+
             $values = $this->normalizeFilterValues($column, (array) $values);
             $query->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.{$column}'))"), $values);
         }
@@ -205,6 +214,27 @@ class SurveySubmissionController extends Controller
                 ->map(fn (OrganizationUnit $unit) => $level === 3 ? $unit->name : ($unit->ancestryChain()[$level === 1 ? 'center' : 'department']?->name))
                 ->filter()
                 ->unique()
+                ->values();
+
+            return response()->json($values);
+        }
+
+        if ($column === 'created_at') {
+            $values = SurveySubmission::query()
+                ->select(DB::raw('DATE(created_at) as submission_date'))
+                ->distinct()
+                ->orderByDesc('submission_date')
+                ->pluck('submission_date');
+
+            return response()->json($values);
+        }
+
+        if (in_array($column, ['full_name', 'national_id'], true)) {
+            $values = SurveySubmission::query()
+                ->select(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.{$column}')) as {$column}"))
+                ->distinct()
+                ->pluck($column)
+                ->filter()
                 ->values();
 
             return response()->json($values);
