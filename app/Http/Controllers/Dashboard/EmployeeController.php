@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Dashboard;
 
+use App\Exports\EmployeesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\OrganizationUnit;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
 class EmployeeController extends Controller
@@ -67,6 +69,15 @@ class EmployeeController extends Controller
         $organizationUnits = OrganizationUnit::orderBy('name')->get();
 
         return view('dashboard.employees.index', compact('organizationUnits'));
+    }
+
+    public function export()
+    {
+        $this->authorize('view', Employee::class);
+
+        ActivityLogService::log('Exported', 'Employee', 'تم تصدير جدول الموظفين إلى Excel.', null, null);
+
+        return Excel::download(new EmployeesExport(), 'employees_export_' . now()->format('Y-m-d_His') . '.xlsx');
     }
 
     private function applyColumnFilters($query, Request $request): void

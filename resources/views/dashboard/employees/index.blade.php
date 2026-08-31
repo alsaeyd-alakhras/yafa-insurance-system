@@ -62,6 +62,13 @@
                 </a>
             </div>
         @endcan
+        @can('view', 'App\Models\Employee')
+            <div class="mx-2 nav-item">
+                <a href="{{ route('dashboard.employees.export') }}" class="m-0 btn btn-outline-success">
+                    <i class="fa-solid fa-file-excel fe-16"></i> تصدير Excel
+                </a>
+            </div>
+        @endcan
         <div class="mx-2 nav-item">
             <button type="button" class="p-2 border-0 btn btn-outline-danger rounded-pill me-n1 waves-effect waves-light d-none"
                 id="filterBtnClear" title="إزالة التصفية">

@@ -47,6 +47,7 @@ Route::group([
     Route::resource('clinics', ClinicController::class)->only(['index', 'store', 'update']);
 
     Route::get('employees/check-national-id/{nationalId}', [EmployeeController::class, 'checkNationalId'])->name('employees.check-national-id');
+    Route::get('employees/export', [EmployeeController::class, 'export'])->name('employees.export');
     Route::resource('employees', EmployeeController::class);
     Route::get('employees-filters/{column}', [EmployeeController::class, 'getFilterOptions'])->name('employees.filters');
     Route::resource('employees.dependents', DependentController::class)->except(['index', 'show', 'create', 'edit']);
