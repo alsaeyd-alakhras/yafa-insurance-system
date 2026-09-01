@@ -43,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        Gate::define('reports.view', function (User $user) {
+            return $user->roles->where('role_name', 'reports.view')->isNotEmpty();
+        });
+
         User::observe(UserObserver::class);
         Constant::observe(ConstantObserver::class);
     }

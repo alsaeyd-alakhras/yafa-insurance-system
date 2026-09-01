@@ -10,6 +10,7 @@ use App\Http\Controllers\Dashboard\EmployeeController;
 use App\Http\Controllers\Dashboard\HomeController;
 use App\Http\Controllers\Dashboard\MedicalDepartmentController;
 use App\Http\Controllers\Dashboard\OrganizationUnitController;
+use App\Http\Controllers\Dashboard\ReportController;
 use App\Http\Controllers\Dashboard\SurveySubmissionController;
 use App\Http\Controllers\Dashboard\UserController;
 use App\Http\Controllers\Dashboard\VisitController;
@@ -70,4 +71,26 @@ Route::group([
     Route::get('survey-submissions/{surveySubmission}', [SurveySubmissionController::class, 'show'])->name('survey-submissions.show');
     Route::post('survey-submissions/{surveySubmission}/approve', [SurveySubmissionController::class, 'approve'])->name('survey-submissions.approve');
     Route::post('survey-submissions/{surveySubmission}/reject', [SurveySubmissionController::class, 'reject'])->name('survey-submissions.reject');
+
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+
+        Route::get('employees', [ReportController::class, 'employees'])->name('employees');
+        Route::get('employees/summary', [ReportController::class, 'employeesSummary'])->name('employees.summary');
+        Route::get('employees-filters/{column}', [ReportController::class, 'employeesFilterOptions'])->name('employees.filters');
+        Route::get('employees/export-excel', [ReportController::class, 'employeesExportExcel'])->name('employees.export-excel');
+        Route::get('employees/export-pdf', [ReportController::class, 'employeesExportPdf'])->name('employees.export-pdf');
+
+        Route::get('visits', [ReportController::class, 'visits'])->name('visits');
+        Route::get('visits/summary', [ReportController::class, 'visitsSummary'])->name('visits.summary');
+        Route::get('visits-filters/{column}', [ReportController::class, 'visitsFilterOptions'])->name('visits.filters');
+        Route::get('visits/export-excel', [ReportController::class, 'visitsExportExcel'])->name('visits.export-excel');
+        Route::get('visits/export-pdf', [ReportController::class, 'visitsExportPdf'])->name('visits.export-pdf');
+
+        Route::get('income', [ReportController::class, 'income'])->name('income');
+        Route::get('income/summary', [ReportController::class, 'incomeSummary'])->name('income.summary');
+        Route::get('income-filters/{column}', [ReportController::class, 'incomeFilterOptions'])->name('income.filters');
+        Route::get('income/export-excel', [ReportController::class, 'incomeExportExcel'])->name('income.export-excel');
+        Route::get('income/export-pdf', [ReportController::class, 'incomeExportPdf'])->name('income.export-pdf');
+    });
 });

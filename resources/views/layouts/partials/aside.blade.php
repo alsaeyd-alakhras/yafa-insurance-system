@@ -40,6 +40,14 @@
             </a>
         </li>
         @endcan
+        @can('reports.view')
+        <li class="menu-item {{ request()->is('reports*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.reports.index') }}" class="menu-link">
+                <i class="fa-solid fa-chart-column me-2"></i>
+                <div data-i18n="reports">التقارير</div>
+            </a>
+        </li>
+        @endcan
         <li class="menu-header small">
             <span class="menu-header-text" data-i18n="Apps &amp; Pages">البيانات الأساسية</span>
         </li>
