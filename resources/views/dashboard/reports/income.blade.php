@@ -41,6 +41,11 @@
     @endpush
 
     <x-slot:extra_nav>
+        <div class="mx-2 nav-item">
+            <a href="{{ route('dashboard.reports.income') }}" class="m-0 btn btn-outline-secondary">
+                <i class="fa-solid fa-filter fe-16"></i> تعديل الفلاتر
+            </a>
+        </div>
         <div class="nav-item">
             <select class="form-control" name="advanced-pagination" id="advanced-pagination">
                 <option value="50">50</option>
@@ -48,16 +53,6 @@
                 <option value="500">500</option>
                 <option value="-1">all</option>
             </select>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-success report-export-btn" data-export-url="{{ route('dashboard.reports.income.export-excel') }}">
-                <i class="fa-solid fa-file-excel fe-16"></i> تصدير Excel
-            </button>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-danger report-export-btn" data-export-url="{{ route('dashboard.reports.income.export-pdf') }}">
-                <i class="fa-solid fa-file-pdf fe-16"></i> تصدير PDF
-            </button>
         </div>
         <div class="mx-2 nav-item">
             <button type="button" class="p-2 border-0 btn btn-outline-danger rounded-pill me-n1 waves-effect waves-light d-none"
@@ -80,6 +75,8 @@
             'total_after' => 'إجمالي بعد الخصم',
             'total_discount' => 'إجمالي الخصم',
             'avg_discount_percentage' => 'متوسط الخصم %',
+            'current_discount_percentage' => 'نسبة الخصم المُعتمدة حالياً',
+            'current_max_discount_amount' => 'الحد الأقصى للخصم (حالياً)',
         ];
         $filterableFields = ['department_name'];
     @endphp
@@ -252,6 +249,14 @@
                                 @endforeach
                             </tr>
                         </thead>
+                        <tfoot>
+                            <tr>
+                                <td class="enhanced-sticky"></td>
+                                @foreach ($fields as $index => $label)
+                                    <td class="text-center fw-bold" id="tfoot-{{ $index }}"></td>
+                                @endforeach
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -274,7 +279,7 @@
             const urlDelete = '';
             const urlSummary = `{{ route('dashboard.reports.income.summary') }}`;
 
-            const fields = ['#', 'department_name', 'visits_count', 'total_before', 'total_after', 'total_discount', 'avg_discount_percentage'];
+            const fields = ['#', 'department_name', 'visits_count', 'total_before', 'total_after', 'total_discount', 'avg_discount_percentage', 'current_discount_percentage', 'current_max_discount_amount'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
@@ -284,12 +289,21 @@
                 { data: 'total_after_formatted', name: 'total_after', orderable: false, searchable: false, class: 'text-center amount-column' },
                 { data: 'total_discount_formatted', name: 'total_discount', orderable: false, searchable: false, class: 'text-center amount-column' },
                 { data: 'avg_discount_percentage', name: 'avg_discount_percentage', orderable: false, searchable: false, class: 'text-center amount-column' },
+                { data: 'current_discount_percentage', name: 'current_discount_percentage', orderable: false, searchable: false, class: 'text-center' },
+                { data: 'current_max_discount_amount', name: 'current_max_discount_amount', orderable: false, searchable: false, class: 'text-center amount-column' },
             ];
 
             const sortConfig = { enabled: false };
             let currentSortColumn = '';
             let currentSortDirection = '';
-            const SUMMABLE_COLUMNS = { enabled: false, columns: {} };
+            const SUMMABLE_COLUMNS = {
+                enabled: true,
+                columns: {
+                    total_before: { format: 'currency' },
+                    total_after: { format: 'currency' },
+                    total_discount: { format: 'currency' },
+                },
+            };
 
             function collectReportFilters() {
                 const filters = {};
@@ -358,12 +372,6 @@
         </script>
         <script type="text/javascript" src="{{ asset('js/datatable.js') }}"></script>
         <script>
-            $(document).on('click', '.report-export-btn', function () {
-                const query = reportFiltersAsQuery();
-                const url = $(this).data('export-url');
-                window.location.href = query ? url + '?' + query : url;
-            });
-
             $(document).on('click', '.income-filter-toolbar .checkbox-list-box', function (event) {
                 event.stopPropagation();
             });

@@ -52,6 +52,7 @@ class VisitsReport
                 'employee.organizationUnit.parent.parent',
                 'clinic',
                 'recordedBy',
+                'lastUpdatedBy',
                 'visitDepartments.medicalDepartment',
             ])
             ->withCount('visitDepartments');
@@ -139,11 +140,14 @@ class VisitsReport
             'اسم المريض',
             'نوع المريض',
             'الموظف صاحب الرصيد',
+            'المركزية',
+            'الدائرة',
             'العيادة',
-            'الأقسام المضافة',
+            'تفاصيل الأقسام (الخصم والمبلغ)',
             'المبلغ قبل الخصم',
             'المبلغ بعد الخصم',
             'مسجّل الزيارة',
+            'آخر تعديل بواسطة',
         ];
     }
 
@@ -164,6 +168,29 @@ class VisitsReport
             'total_after_discount' => number_format((float) $totalAfterDiscount, 2),
             'avg_departments_per_visit' => number_format(round((float) $avgDepartments, 1), 1),
         ];
+    }
+
+    /** Raw numeric sums for the DataTable footer totals row (unformatted, JS does its own formatting). */
+    public static function totals(Request $request): array
+    {
+        $query = self::query($request);
+
+        return [
+            'total_before_discount' => (float) (clone $query)->sum('total_before_discount'),
+            'total_after_discount' => (float) (clone $query)->sum('total_after_discount'),
+        ];
+    }
+
+    public static function departmentsDetail(Visit $visit): string
+    {
+        return $visit->visitDepartments->map(function ($visitDepartment) {
+            $name = self::DEPARTMENT_LABELS[$visitDepartment->medicalDepartment?->name] ?? $visitDepartment->medicalDepartment?->name ?? '-';
+            $percentage = rtrim(rtrim(number_format((float) $visitDepartment->applied_discount_percentage, 2), '0'), '.');
+            $before = $visitDepartment->amount_before_discount !== null ? number_format((float) $visitDepartment->amount_before_discount, 2) : '-';
+            $after = $visitDepartment->amount_after_discount !== null ? number_format((float) $visitDepartment->amount_after_discount, 2) : '-';
+
+            return "{$name} (خصم {$percentage}%: {$before} ← {$after})";
+        })->implode(' | ') ?: '-';
     }
 
     public static function filterOptions(string $column, Request $request): Collection
@@ -280,16 +307,21 @@ class VisitsReport
 
     private static function row(Visit $visit): array
     {
+        $chain = $visit->employee?->organizationUnit?->ancestryChain() ?? [];
+
         return [
             'visit_date' => $visit->visit_date,
             'patient_name' => $visit->patientEmployee?->full_name ?? $visit->patientDependent?->full_name ?? '-',
             'patient_type' => $visit->patient_employee_id ? self::PATIENT_TYPE_LABELS['employee'] : self::PATIENT_TYPE_LABELS['dependent'],
             'employee_name' => $visit->employee?->full_name ?? '-',
+            'organization_center' => $chain['center']->name ?? '-',
+            'organization_department' => $chain['department']->name ?? '-',
             'clinic_name' => $visit->clinic?->name ?? '-',
-            'departments_list' => $visit->visitDepartments->pluck('medicalDepartment.name')->filter()->map(fn ($name) => self::DEPARTMENT_LABELS[$name] ?? $name)->implode('، ') ?: '-',
+            'departments_detail' => self::departmentsDetail($visit),
             'total_before_discount' => $visit->total_before_discount !== null ? number_format((float) $visit->total_before_discount, 2) : '-',
             'total_after_discount' => $visit->total_after_discount !== null ? number_format((float) $visit->total_after_discount, 2) : '-',
             'recorded_by_name' => $visit->recordedBy?->name ?? '-',
+            'last_updated_by_name' => $visit->lastUpdatedBy?->name ?? '-',
         ];
     }
 

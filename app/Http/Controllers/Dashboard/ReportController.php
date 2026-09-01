@@ -8,6 +8,7 @@ use App\Exports\Reports\VisitsReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
 use App\Models\Employee;
+use App\Models\MedicalDepartment;
 use App\Models\OrganizationUnit;
 use App\Models\Visit;
 use App\Reports\EmployeesReport;
@@ -50,10 +51,18 @@ class ReportController extends Controller
                 ->addColumn('organization_section', function (Employee $employee) {
                     return $employee->organizationUnit?->ancestryChain()['section']?->name ?? '-';
                 })
+                ->addColumn('dependents_detail', fn (Employee $employee) => EmployeesReport::dependentsDetail($employee))
                 ->addColumn('approved_by_name', fn (Employee $employee) => $employee->approvedBy?->name ?? '-')
                 ->addColumn('approved_at_formatted', fn (Employee $employee) => $employee->approved_at ? Carbon::parse($employee->approved_at)->format('Y-m-d H:i') : '-')
                 ->addColumn('created_at_formatted', fn (Employee $employee) => $employee->created_at?->format('Y-m-d H:i') ?? '-')
                 ->make(true);
+        }
+
+        if (! $this->hasReportBeenGenerated($request)) {
+            return view('dashboard.reports.employees-form', [
+                'organizationCenters' => OrganizationUnit::where('level', 1)->orderBy('name')->pluck('name'),
+                'organizationDepartments' => OrganizationUnit::where('level', 2)->orderBy('name')->pluck('name'),
+            ]);
         }
 
         return view('dashboard.reports.employees');
@@ -130,7 +139,19 @@ class ReportController extends Controller
                 ->addColumn('recorded_by_name', fn (Visit $visit) => $visit->recordedBy?->name ?? '-')
                 ->addColumn('organization_center', fn (Visit $visit) => $visit->employee?->organizationUnit?->ancestryChain()['center']?->name ?? '-')
                 ->addColumn('organization_department', fn (Visit $visit) => $visit->employee?->organizationUnit?->ancestryChain()['department']?->name ?? '-')
+                ->addColumn('departments_detail', fn (Visit $visit) => VisitsReport::departmentsDetail($visit))
+                ->addColumn('last_updated_by_name', fn (Visit $visit) => $visit->lastUpdatedBy?->name ?? '-')
+                ->with('totals', VisitsReport::totals($request))
                 ->make(true);
+        }
+
+        if (! $this->hasReportBeenGenerated($request)) {
+            return view('dashboard.reports.visits-form', [
+                'organizationCenters' => OrganizationUnit::where('level', 1)->orderBy('name')->pluck('name'),
+                'organizationDepartments' => OrganizationUnit::where('level', 2)->orderBy('name')->pluck('name'),
+                'clinics' => Clinic::query()->orderBy('name')->pluck('name'),
+                'departmentLabels' => VisitsReport::DEPARTMENT_LABELS,
+            ]);
         }
 
         return view('dashboard.reports.visits');
@@ -171,15 +192,32 @@ class ReportController extends Controller
 
                     return $totalBefore > 0 ? number_format(((float) $department->total_discount / $totalBefore) * 100, 1) : '-';
                 })
+                ->addColumn('current_discount_percentage', function ($department) {
+                    $config = MedicalDepartment::where('name', $department->department_name)->first();
+
+                    return $config ? rtrim(rtrim(number_format($config->discount_percentage, 2), '0'), '.') . '%' : '-';
+                })
+                ->addColumn('current_max_discount_amount', function ($department) {
+                    $config = MedicalDepartment::where('name', $department->department_name)->first();
+
+                    return $config?->max_discount_amount !== null ? number_format((float) $config->max_discount_amount, 2) : 'بدون حد أقصى';
+                })
+                ->with('totals', IncomeByDepartmentReport::totals($request))
                 ->make(true);
         }
 
-        return view('dashboard.reports.income', [
+        $viewData = [
             'departmentLabels' => IncomeByDepartmentReport::DEPARTMENT_LABELS,
             'clinics' => Clinic::query()->orderBy('name')->pluck('name'),
             'organizationCenters' => OrganizationUnit::where('level', 1)->orderBy('name')->pluck('name'),
             'organizationDepartments' => OrganizationUnit::where('level', 2)->orderBy('name')->pluck('name'),
-        ]);
+        ];
+
+        if (! $this->hasReportBeenGenerated($request)) {
+            return view('dashboard.reports.income-form', $viewData);
+        }
+
+        return view('dashboard.reports.income', $viewData);
     }
 
     public function incomeSummary(Request $request): JsonResponse
@@ -223,6 +261,7 @@ class ReportController extends Controller
             'headings' => VisitsReport::headings(),
             'rows' => $rows,
             'summary' => VisitsReport::summary($request),
+            'totals' => VisitsReport::totals($request),
         ], [], [
             'orientation' => 'L',
             'default_font' => 'dejavusans',
@@ -258,6 +297,7 @@ class ReportController extends Controller
             'headings' => IncomeByDepartmentReport::headings(),
             'rows' => $rows,
             'summary' => IncomeByDepartmentReport::summary($request),
+            'totals' => IncomeByDepartmentReport::totals($request),
         ], [], [
             'orientation' => 'L',
             'default_font' => 'dejavusans',
@@ -266,6 +306,12 @@ class ReportController extends Controller
             'autoLangToFont' => true,
             'tempDir' => storage_path('app/mpdf'),
         ])->stream($filename);
+    }
+
+    /** True once the user has submitted the filter form at least once (any query param present), false when the page should show the filter form instead of the results table. */
+    private function hasReportBeenGenerated(Request $request): bool
+    {
+        return $request->query() !== [];
     }
 
     private function applyEmployeesSort($query, Request $request): void

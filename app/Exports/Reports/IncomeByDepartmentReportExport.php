@@ -22,7 +22,22 @@ class IncomeByDepartmentReportExport implements FromCollection, WithHeadings, Wi
 
     public function collection()
     {
-        return $this->rows;
+        if ($this->rows->isEmpty()) {
+            return $this->rows;
+        }
+
+        $totals = IncomeByDepartmentReport::totals($this->request);
+
+        return $this->rows->push([
+            'department_name' => 'الإجمالي',
+            'visits_count' => $this->rows->sum('visits_count'),
+            'total_before' => number_format($totals['total_before'], 2),
+            'total_after' => number_format($totals['total_after'], 2),
+            'total_discount' => number_format($totals['total_discount'], 2),
+            'avg_discount_percentage' => '',
+            'current_discount_percentage' => '',
+            'current_max_discount_amount' => '',
+        ]);
     }
 
     public function headings(): array
@@ -34,6 +49,11 @@ class IncomeByDepartmentReportExport implements FromCollection, WithHeadings, Wi
     {
         $sheet->getRightToLeft(true);
         $sheet->getStyle('1:1')->getFont()->setBold(true);
+
+        if ($this->rows->isNotEmpty()) {
+            $lastRow = $this->rows->count() + 1;
+            $sheet->getStyle($lastRow . ':' . $lastRow)->getFont()->setBold(true);
+        }
 
         return [];
     }

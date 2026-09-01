@@ -41,6 +41,11 @@
     @endpush
 
     <x-slot:extra_nav>
+        <div class="mx-2 nav-item">
+            <a href="{{ route('dashboard.reports.visits') }}" class="m-0 btn btn-outline-secondary">
+                <i class="fa-solid fa-filter fe-16"></i> تعديل الفلاتر
+            </a>
+        </div>
         <div class="nav-item">
             <select class="form-control" name="advanced-pagination" id="advanced-pagination">
                 <option value="50">50</option>
@@ -48,16 +53,6 @@
                 <option value="500">500</option>
                 <option value="-1">all</option>
             </select>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-success report-export-btn" data-export-url="{{ route('dashboard.reports.visits.export-excel') }}">
-                <i class="fa-solid fa-file-excel fe-16"></i> تصدير Excel
-            </button>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-danger report-export-btn" data-export-url="{{ route('dashboard.reports.visits.export-pdf') }}">
-                <i class="fa-solid fa-file-pdf fe-16"></i> تصدير PDF
-            </button>
         </div>
         <div class="mx-2 nav-item">
             <button type="button" class="p-2 border-0 btn btn-outline-danger rounded-pill me-n1 waves-effect waves-light d-none"
@@ -80,9 +75,11 @@
             'employee_name' => 'الموظف صاحب الرصيد',
             'clinic_name' => 'العيادة',
             'departments_list' => 'الأقسام المضافة',
+            'departments_detail' => 'تفاصيل الأقسام (الخصم والمبلغ)',
             'total_before_discount' => 'المبلغ قبل الخصم',
             'total_after_discount' => 'المبلغ بعد الخصم',
             'recorded_by_name' => 'مسجّل الزيارة',
+            'last_updated_by_name' => 'آخر تعديل بواسطة',
             'organization_center' => 'المركزية',
             'organization_department' => 'الدائرة',
         ];
@@ -202,6 +199,14 @@
                                 @endforeach
                             </tr>
                         </thead>
+                        <tfoot>
+                            <tr>
+                                <td class="enhanced-sticky"></td>
+                                @foreach ($fields as $index => $label)
+                                    <td class="text-center fw-bold" id="tfoot-{{ $index }}"></td>
+                                @endforeach
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -224,7 +229,7 @@
             const urlDelete = '';
             const urlSummary = `{{ route('dashboard.reports.visits.summary') }}`;
 
-            const fields = ['#', 'visit_date', 'patient_name', 'patient_type', 'employee_name', 'clinic_name', 'departments_list', 'total_before_discount', 'total_after_discount', 'recorded_by_name', 'organization_center', 'organization_department'];
+            const fields = ['#', 'visit_date', 'patient_name', 'patient_type', 'employee_name', 'clinic_name', 'departments_list', 'departments_detail', 'total_before_discount', 'total_after_discount', 'recorded_by_name', 'last_updated_by_name', 'organization_center', 'organization_department'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
@@ -234,9 +239,11 @@
                 { data: 'employee_name', name: 'employee_name', orderable: false },
                 { data: 'clinic_name', name: 'clinic_name', orderable: false },
                 { data: 'departments_list', name: 'departments_list', orderable: false },
+                { data: 'departments_detail', name: 'departments_detail', orderable: false, searchable: false, className: 'text-wrap', width: '260px' },
                 { data: 'total_before_discount_formatted', name: 'total_before_discount', orderable: false, class: 'text-center amount-column' },
                 { data: 'total_after_discount_formatted', name: 'total_after_discount', orderable: false, class: 'text-center amount-column' },
                 { data: 'recorded_by_name', name: 'recorded_by_name', orderable: false },
+                { data: 'last_updated_by_name', name: 'last_updated_by_name', orderable: false, searchable: false },
                 { data: 'organization_center', name: 'organization_center', orderable: false, searchable: false },
                 { data: 'organization_department', name: 'organization_department', orderable: false, searchable: false },
             ];
@@ -244,7 +251,13 @@
             const sortConfig = { enabled: true };
             let currentSortColumn = '';
             let currentSortDirection = '';
-            const SUMMABLE_COLUMNS = { enabled: false, columns: {} };
+            const SUMMABLE_COLUMNS = {
+                enabled: true,
+                columns: {
+                    total_before_discount: { format: 'currency' },
+                    total_after_discount: { format: 'currency' },
+                },
+            };
 
             function collectReportFilters() {
                 const filters = {};
@@ -312,12 +325,5 @@
             }
         </script>
         <script type="text/javascript" src="{{ asset('js/datatable.js') }}"></script>
-        <script>
-            $(document).on('click', '.report-export-btn', function () {
-                const query = reportFiltersAsQuery();
-                const url = $(this).data('export-url');
-                window.location.href = query ? url + '?' + query : url;
-            });
-        </script>
     @endpush
 </x-front-layout>

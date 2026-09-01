@@ -35,6 +35,17 @@ class EmployeesReport
         'admin' => 'إضافة مباشرة',
     ];
 
+    public const DEPENDENT_TYPE_LABELS = [
+        'spouse' => 'زوج/ة',
+        'child' => 'ابن/ابنة',
+        'parent' => 'والد/ة',
+    ];
+
+    public const PARENT_TYPE_LABELS = [
+        'father' => 'أب',
+        'mother' => 'أم',
+    ];
+
     public const FILTERABLE_COLUMNS = [
         'status',
         'gender',
@@ -50,7 +61,7 @@ class EmployeesReport
     public static function query(Request $request, ?array $columnFilters = null): Builder
     {
         $query = Employee::query()
-            ->with(['organizationUnit.parent.parent', 'approvedBy'])
+            ->with(['organizationUnit.parent.parent', 'approvedBy', 'dependents'])
             ->withCount('dependents');
 
         $filters = self::filtersFromRequest($request, $columnFilters);
@@ -122,6 +133,7 @@ class EmployeesReport
             'القسم',
             'مصدر التسجيل',
             'عدد التابعين',
+            'تفاصيل التابعين',
             'اعتُمد بواسطة',
             'تاريخ الاعتماد',
             'تاريخ الإنشاء',
@@ -245,10 +257,24 @@ class EmployeesReport
             'section' => $chain['section']->name ?? '',
             'source' => self::SOURCE_LABELS[$employee->source] ?? $employee->source,
             'dependents_count' => $employee->dependents_count,
+            'dependents_detail' => self::dependentsDetail($employee),
             'approved_by' => $employee->approvedBy->name ?? '',
             'approved_at' => $employee->approved_at ? Carbon::parse($employee->approved_at)->format('Y-m-d H:i') : '',
             'created_at' => $employee->created_at?->format('Y-m-d H:i') ?? '',
         ];
+    }
+
+    public static function dependentsDetail(Employee $employee): string
+    {
+        return $employee->dependents->map(function ($dependent) {
+            $typeLabel = self::DEPENDENT_TYPE_LABELS[$dependent->type] ?? $dependent->type;
+
+            if ($dependent->type === 'parent' && $dependent->parent_type) {
+                $typeLabel = self::PARENT_TYPE_LABELS[$dependent->parent_type] ?? $typeLabel;
+            }
+
+            return "{$typeLabel}: {$dependent->full_name} ({$dependent->national_id})";
+        })->implode(' | ') ?: '-';
     }
 
     private static function filtersFromRequest(Request $request, ?array $columnFilters = null): array

@@ -53,6 +53,11 @@
     @endpush
 
     <x-slot:extra_nav>
+        <div class="mx-2 nav-item">
+            <a href="{{ route('dashboard.reports.employees') }}" class="m-0 btn btn-outline-secondary">
+                <i class="fa-solid fa-filter fe-16"></i> تعديل الفلاتر
+            </a>
+        </div>
         <div class="nav-item">
             <select class="form-control" name="advanced-pagination" id="advanced-pagination">
                 <option value="50">50</option>
@@ -60,16 +65,6 @@
                 <option value="500">500</option>
                 <option value="-1">all</option>
             </select>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-success report-export-btn" data-export-url="{{ route('dashboard.reports.employees.export-excel') }}">
-                <i class="fa-solid fa-file-excel fe-16"></i> تصدير Excel
-            </button>
-        </div>
-        <div class="mx-2 nav-item">
-            <button type="button" class="m-0 btn btn-outline-danger report-export-btn" data-export-url="{{ route('dashboard.reports.employees.export-pdf') }}">
-                <i class="fa-solid fa-file-pdf fe-16"></i> تصدير PDF
-            </button>
         </div>
         <div class="mx-2 nav-item">
             <button type="button" class="p-2 border-0 btn btn-outline-danger rounded-pill me-n1 waves-effect waves-light d-none"
@@ -97,6 +92,7 @@
             'organization_section' => 'القسم',
             'source' => 'مصدر التسجيل',
             'dependents_count' => 'عدد التابعين',
+            'dependents_detail' => 'تفاصيل التابعين',
             'approved_by_name' => 'اعتُمد بواسطة',
             'approved_at' => 'تاريخ الاعتماد',
             'created_at' => 'تاريخ الإنشاء',
@@ -281,7 +277,7 @@
             };
             const sourceLabels = { survey: 'استبيان', admin: 'إضافة مباشرة' };
 
-            const fields = ['#', 'id', 'full_name', 'national_id', 'status', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_section', 'source', 'dependents_count', 'approved_by_name', 'approved_at', 'created_at'];
+            const fields = ['#', 'id', 'full_name', 'national_id', 'status', 'gender', 'marital_status', 'organization_center', 'organization_department', 'organization_section', 'source', 'dependents_count', 'dependents_detail', 'approved_by_name', 'approved_at', 'created_at'];
 
             const columnsTable = [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, class: 'enhanced-sticky text-center' },
@@ -314,6 +310,10 @@
                         const cls = count > 0 ? 'dependents-count-badge' : 'dependents-count-badge is-empty';
                         return `<span class="${cls}">${count}</span>`;
                     },
+                },
+                {
+                    data: 'dependents_detail', name: 'dependents_detail', orderable: false, searchable: false,
+                    className: 'text-wrap', width: '260px',
                 },
                 { data: 'approved_by_name', name: 'approved_by_name', orderable: false, searchable: false },
                 { data: 'approved_at_formatted', name: 'approved_at', orderable: false, class: 'text-center' },
@@ -471,11 +471,6 @@
                 updateEmployeesSummary();
             });
 
-            $(document).on('click', '.report-export-btn', function () {
-                const query = reportFiltersAsQuery();
-                const url = $(this).data('export-url');
-                window.location.href = query ? url + '?' + query : url;
-            });
         </script>
     @endpush
 </x-front-layout>

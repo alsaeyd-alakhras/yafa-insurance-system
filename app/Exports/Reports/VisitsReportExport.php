@@ -22,7 +22,26 @@ class VisitsReportExport implements FromCollection, WithHeadings, WithStyles, Sh
 
     public function collection()
     {
-        return $this->rows;
+        if ($this->rows->isEmpty()) {
+            return $this->rows;
+        }
+
+        $totals = VisitsReport::totals($this->request);
+
+        return $this->rows->push([
+            'visit_date' => 'الإجمالي',
+            'patient_name' => '',
+            'patient_type' => '',
+            'employee_name' => '',
+            'organization_center' => '',
+            'organization_department' => '',
+            'clinic_name' => '',
+            'departments_detail' => '',
+            'total_before_discount' => number_format($totals['total_before_discount'], 2),
+            'total_after_discount' => number_format($totals['total_after_discount'], 2),
+            'recorded_by_name' => '',
+            'last_updated_by_name' => '',
+        ]);
     }
 
     public function headings(): array
@@ -34,6 +53,11 @@ class VisitsReportExport implements FromCollection, WithHeadings, WithStyles, Sh
     {
         $sheet->getRightToLeft(true);
         $sheet->getStyle('1:1')->getFont()->setBold(true);
+
+        if ($this->rows->isNotEmpty()) {
+            $lastRow = $this->rows->count() + 1;
+            $sheet->getStyle($lastRow . ':' . $lastRow)->getFont()->setBold(true);
+        }
 
         return [];
     }

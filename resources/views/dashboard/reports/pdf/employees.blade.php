@@ -6,32 +6,65 @@
         body {
             direction: rtl;
             font-family: dejavusans, sans-serif;
-            font-size: 10px;
-            color: #222;
+            font-size: 9.5px;
+            color: #2b2b2b;
         }
 
-        h1 {
-            font-size: 18px;
-            margin: 0 0 6px;
+        .report-header {
+            border-bottom: 2px solid #696cff;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .report-header h1 {
+            font-size: 17px;
+            margin: 0 0 4px;
+            color: #1a1a1a;
+        }
+
+        .report-header .subtitle {
+            font-size: 10px;
+            color: #696cff;
+            font-weight: bold;
         }
 
         .meta {
-            color: #555;
-            margin-bottom: 10px;
-            line-height: 1.7;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.8;
+            font-size: 9px;
         }
 
-        .summary {
+        .meta span.label {
+            font-weight: bold;
+            color: #444;
+        }
+
+        table.summary {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
-        .summary td {
+        table.summary td {
             border: 1px solid #d9dee3;
-            padding: 6px;
-            background: #f7f8fa;
+            padding: 7px 8px;
+            background: #f7f8fc;
+            text-align: center;
+        }
+
+        table.summary td .label {
+            display: block;
+            font-size: 8px;
+            color: #777;
+            margin-bottom: 2px;
+        }
+
+        table.summary td .value {
+            display: block;
+            font-size: 13px;
             font-weight: bold;
+            color: #1a1a1a;
         }
 
         table.report {
@@ -42,29 +75,59 @@
         table.report th,
         table.report td {
             border: 1px solid #d9dee3;
-            padding: 5px;
+            padding: 4px 5px;
             vertical-align: top;
         }
 
         table.report th {
-            background: #eef1f5;
+            background: #444a5e;
+            color: #fff;
             font-weight: bold;
+            font-size: 9px;
+        }
+
+        table.report tbody tr:nth-child(even) {
+            background: #f7f8fc;
+        }
+
+        .report-footer {
+            margin-top: 12px;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 6px;
         }
     </style>
 </head>
 <body>
-    <h1>{{ $appName }} - تقرير الموظفين</h1>
+    <div class="report-header">
+        <h1>{{ $appName }}</h1>
+        <div class="subtitle">تقرير الموظفين</div>
+    </div>
+
     <div class="meta">
-        <div>تاريخ التصدير: {{ $generatedAt }}</div>
-        <div>الفلاتر: {{ $filtersDescription }}</div>
+        <div><span class="label">تاريخ التصدير:</span> {{ $generatedAt }}</div>
+        <div><span class="label">الفلاتر المطبَّقة:</span> {{ $filtersDescription }}</div>
     </div>
 
     <table class="summary">
         <tr>
-            <td>إجمالي الموظفين: {{ $summary['total_employees'] }}</td>
-            <td>الموظفون النشطون: {{ $summary['active_count'] }}</td>
-            <td>قيد الموافقة: {{ $summary['pending_count'] }}</td>
-            <td>إجمالي التابعين: {{ $summary['total_dependents'] }}</td>
+            <td>
+                <span class="label">إجمالي الموظفين</span>
+                <span class="value">{{ $summary['total_employees'] }}</span>
+            </td>
+            <td>
+                <span class="label">الموظفون النشطون</span>
+                <span class="value">{{ $summary['active_count'] }}</span>
+            </td>
+            <td>
+                <span class="label">قيد الموافقة</span>
+                <span class="value">{{ $summary['pending_count'] }}</span>
+            </td>
+            <td>
+                <span class="label">إجمالي التابعين</span>
+                <span class="value">{{ $summary['total_dependents'] }}</span>
+            </td>
         </tr>
     </table>
 
@@ -90,5 +153,9 @@
             @endforelse
         </tbody>
     </table>
+
+    <div class="report-footer">
+        تم إنشاء هذا التقرير آلياً من {{ $appName }} — {{ $generatedAt }}
+    </div>
 </body>
 </html>

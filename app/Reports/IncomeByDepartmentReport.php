@@ -3,6 +3,7 @@
 namespace App\Reports;
 
 use App\Models\Clinic;
+use App\Models\MedicalDepartment;
 use App\Models\OrganizationUnit;
 use App\Models\VisitDepartment;
 use Carbon\Carbon;
@@ -56,6 +57,8 @@ class IncomeByDepartmentReport
             'إجمالي بعد الخصم',
             'إجمالي الخصم',
             'متوسط الخصم %',
+            'نسبة الخصم المُعتمدة حالياً',
+            'الحد الأقصى للخصم (حالياً)',
         ];
     }
 
@@ -69,6 +72,18 @@ class IncomeByDepartmentReport
             'total_after' => number_format((float) $rows->sum(fn ($row) => (float) $row->total_after), 2),
             'total_discount' => number_format((float) $rows->sum(fn ($row) => (float) $row->total_discount), 2),
             'top_department' => $topDepartment ? self::departmentLabel($topDepartment->department_name) : '-',
+        ];
+    }
+
+    /** Raw numeric sums for the DataTable footer totals row (unformatted, JS does its own formatting). */
+    public static function totals(Request $request): array
+    {
+        $rows = self::aggregates($request);
+
+        return [
+            'total_before' => (float) $rows->sum(fn ($row) => (float) $row->total_before),
+            'total_after' => (float) $rows->sum(fn ($row) => (float) $row->total_after),
+            'total_discount' => (float) $rows->sum(fn ($row) => (float) $row->total_discount),
         ];
     }
 
@@ -158,6 +173,7 @@ class IncomeByDepartmentReport
         $totalBefore = (float) $department->total_before;
         $totalDiscount = (float) $department->total_discount;
         $avgDiscount = $totalBefore > 0 ? ($totalDiscount / $totalBefore) * 100 : null;
+        $config = MedicalDepartment::where('name', $department->department_name)->first();
 
         return [
             'department_name' => self::departmentLabel($department->department_name),
@@ -166,6 +182,8 @@ class IncomeByDepartmentReport
             'total_after' => number_format((float) $department->total_after, 2),
             'total_discount' => number_format($totalDiscount, 2),
             'avg_discount_percentage' => $avgDiscount === null ? '-' : number_format($avgDiscount, 1),
+            'current_discount_percentage' => $config ? rtrim(rtrim(number_format($config->discount_percentage, 2), '0'), '.').'%' : '-',
+            'current_max_discount_amount' => $config?->max_discount_amount !== null ? number_format((float) $config->max_discount_amount, 2) : 'بدون حد أقصى',
         ];
     }
 
