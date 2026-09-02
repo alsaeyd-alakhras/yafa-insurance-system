@@ -80,6 +80,7 @@ class VisitController extends Controller
                     $query->whereDate('visit_date', '<=', $values['to']);
                     $hasDateFilter = true;
                 }
+
                 continue;
             }
 
@@ -535,7 +536,7 @@ class VisitController extends Controller
         ];
     }
 
-    public function destroy(Visit $visit): RedirectResponse
+    public function destroy(Request $request, Visit $visit): RedirectResponse|JsonResponse
     {
         $this->authorize('delete', $visit);
 
@@ -554,6 +555,10 @@ class VisitController extends Controller
             $old,
             null
         );
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'تم حذف الزيارة.']);
+        }
 
         return redirect()->route('dashboard.visits.index')->with('success', 'تم حذف الزيارة.');
     }

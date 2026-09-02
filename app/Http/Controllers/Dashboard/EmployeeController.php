@@ -77,7 +77,7 @@ class EmployeeController extends Controller
 
         ActivityLogService::log('Exported', 'Employee', 'تم تصدير جدول الموظفين إلى Excel.', null, null);
 
-        return Excel::download(new EmployeesExport(), 'employees_export_' . now()->format('Y-m-d_His') . '.xlsx');
+        return Excel::download(new EmployeesExport, 'employees_export_'.now()->format('Y-m-d_His').'.xlsx');
     }
 
     private function applyColumnFilters($query, Request $request): void
@@ -91,23 +91,27 @@ class EmployeeController extends Controller
 
             if ($column === 'organization_unit_name') {
                 $query->whereHas('organizationUnit', fn ($q) => $q->whereIn('name', (array) $values));
+
                 continue;
             }
 
             if ($column === 'organization_center') {
                 $sectionIds = $this->sectionIdsUnderAncestors(1, (array) $values);
                 $query->whereIn('organization_unit_id', $sectionIds);
+
                 continue;
             }
 
             if ($column === 'organization_department') {
                 $sectionIds = $this->sectionIdsUnderAncestors(2, (array) $values);
                 $query->whereIn('organization_unit_id', $sectionIds);
+
                 continue;
             }
 
             if ($column === 'dependents_count') {
                 $query->havingRaw('dependents_count in ('.implode(',', array_fill(0, count((array) $values), '?')).')', (array) $values);
+
                 continue;
             }
 
@@ -273,7 +277,7 @@ class EmployeeController extends Controller
         $this->authorize('create', Employee::class);
 
         $exists = false;
-        $rule = new UniqueNationalId();
+        $rule = new UniqueNationalId;
         $rule->validate('national_id', $nationalId, function () use (&$exists) {
             $exists = true;
         });
@@ -322,7 +326,7 @@ class EmployeeController extends Controller
         return redirect()->route('dashboard.employees.edit', $employee)->with('success', 'تم تعديل بيانات الموظف.');
     }
 
-    public function destroy(Employee $employee): RedirectResponse
+    public function destroy(Request $request, Employee $employee): RedirectResponse|JsonResponse
     {
         $this->authorize('delete', $employee);
 
@@ -331,6 +335,10 @@ class EmployeeController extends Controller
         try {
             $employee->delete();
         } catch (\Illuminate\Database\QueryException $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'لا يمكن حذف موظف له زيارات مسجّلة.'], 409);
+            }
+
             return redirect()->route('dashboard.employees.index')
                 ->with('danger', 'لا يمكن حذف موظف له زيارات مسجّلة.');
         }
@@ -342,6 +350,10 @@ class EmployeeController extends Controller
             $old,
             null
         );
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'تم حذف الموظف.']);
+        }
 
         return redirect()->route('dashboard.employees.index')->with('success', 'تم حذف الموظف.');
     }
@@ -463,4 +475,3 @@ class EmployeeController extends Controller
         }
     }
 }
-
