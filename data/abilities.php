@@ -15,7 +15,7 @@ return [
     //     'update' => 'تعديل',
     //     'delete' => 'حذف',
     // ],
-    'activitylogs' => [
+    'activity_logs' => [
         'name' => 'العمليات',
         'view' => 'عرض',
     ],

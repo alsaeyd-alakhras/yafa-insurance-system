@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\User;
 use Illuminate\Support\Str;
+
 class ModelPolicy
 {
     /**
@@ -17,13 +18,13 @@ class ModelPolicy
     public function __call($name, $arguments)
     {
         $class_name = str_replace('Policy', '', class_basename($this));
-        $class_name = Str::plural(Str::lower($class_name));
+        $class_name = Str::plural(Str::snake($class_name));
 
         if ($name === 'viewAny') {
             $name = 'view';
         }
 
-        $ability = $class_name . '.' . Str::kebab($name);
+        $ability = $class_name.'.'.Str::kebab($name);
         $user = $arguments[0];
 
         if ($user instanceof User) {
