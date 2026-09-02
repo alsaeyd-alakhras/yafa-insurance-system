@@ -6,7 +6,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -29,6 +28,7 @@ class User extends Authenticatable
         'avatar',
         'super_admin',
         'role',
+        'medical_department_id',
     ];
 
     /**
@@ -59,6 +59,11 @@ class User extends Authenticatable
         return $this->hasMany(RoleUser::class, 'user_id', 'id');
     }
 
+    public function medicalDepartment(): BelongsTo
+    {
+        return $this->belongsTo(MedicalDepartment::class);
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
@@ -73,8 +78,9 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute() // $user->avatar-url
     {
         if ($this->avatar) {
-            return asset('storage/' . $this->avatar);
+            return asset('storage/'.$this->avatar);
         }
+
         return asset('imgs/user.jpg');
     }
 }

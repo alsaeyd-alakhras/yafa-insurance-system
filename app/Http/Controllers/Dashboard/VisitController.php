@@ -273,14 +273,36 @@ class VisitController extends Controller
                 ->with('danger', 'انتهت زيارات هذا الشهر لهذا الموظف.');
         }
 
-        $visit = Visit::create([
-            'employee_id' => $quotaOwner->id,
-            'patient_employee_id' => $employee?->id,
-            'patient_dependent_id' => $dependent?->id,
-            'clinic_id' => null,
-            'visit_date' => now()->toDateString(),
-            'recorded_by' => auth()->id(),
-        ]);
+        $visit = DB::transaction(function () use ($quotaOwner, $employee, $dependent) {
+            $visit = Visit::create([
+                'employee_id' => $quotaOwner->id,
+                'patient_employee_id' => $employee?->id,
+                'patient_dependent_id' => $dependent?->id,
+                'clinic_id' => null,
+                'visit_date' => now()->toDateString(),
+                'recorded_by' => auth()->id(),
+            ]);
+
+            if (auth()->user()->role === 'department_user') {
+                $department = MedicalDepartment::findOrFail(auth()->user()->medical_department_id);
+
+                VisitDepartment::create([
+                    'visit_id' => $visit->id,
+                    'medical_department_id' => $department->id,
+                    'applied_discount_percentage' => $department->discount_percentage,
+                    'applied_max_discount_amount' => $department->max_discount_amount,
+                    'amount_before_discount' => null,
+                    'amount_after_discount' => null,
+                    'added_at' => now(),
+                    'added_by' => auth()->id(),
+                ]);
+
+                $visit->recalculateTotals();
+                $visit->update(['last_updated_by' => auth()->id()]);
+            }
+
+            return $visit;
+        });
 
         $patientName = $employee?->full_name ?? $dependent?->full_name;
 
@@ -330,6 +352,10 @@ class VisitController extends Controller
 
         $medicalDepartments = MedicalDepartment::where('is_active', true)
             ->whereNotIn('id', $visit->visitDepartments->pluck('medical_department_id'))
+            ->when(
+                auth()->user()->role === 'department_user',
+                fn ($query) => $query->where('id', auth()->user()->medical_department_id)
+            )
             ->get();
 
         $clinics = Clinic::where('is_active', true)->orderBy('name')->get();
@@ -348,6 +374,8 @@ class VisitController extends Controller
         ]);
 
         $department = MedicalDepartment::findOrFail($validated['medical_department_id']);
+        $this->authorize('addDepartment', [$visit, $department]);
+
         $request->validate($department->name === 'clinics'
             ? ['clinic_id' => 'required|exists:clinics,id']
             : ['clinic_id' => 'prohibited']);
@@ -414,6 +442,7 @@ class VisitController extends Controller
     {
         $this->authorize('update', $visit);
         abort_unless($visitDepartment->visit_id === $visit->id, 404);
+        $this->authorize('manageDepartmentRow', [$visit, $visitDepartment]);
 
         $validated = $request->validate([
             'amount_before_discount' => 'nullable|numeric|min:0',
@@ -442,6 +471,7 @@ class VisitController extends Controller
     {
         $this->authorize('update', $visit);
         abort_unless($visitDepartment->visit_id === $visit->id, 404);
+        $this->authorize('manageDepartmentRow', [$visit, $visitDepartment]);
 
         $visitDepartment->load('medicalDepartment');
         $departmentName = $visitDepartment->medicalDepartment->name;
@@ -531,6 +561,10 @@ class VisitController extends Controller
             'available_departments' => MedicalDepartment::query()
                 ->where('is_active', true)
                 ->whereNotIn('id', $visit->visitDepartments->pluck('medical_department_id'))
+                ->when(
+                    auth()->user()->role === 'department_user',
+                    fn ($query) => $query->where('id', auth()->user()->medical_department_id)
+                )
                 ->get(['id', 'name'])
                 ->values(),
         ];

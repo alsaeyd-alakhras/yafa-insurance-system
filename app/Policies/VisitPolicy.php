@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Models\MedicalDepartment;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\VisitDepartment;
 
 class VisitPolicy
 {
@@ -25,6 +27,24 @@ class VisitPolicy
     public function update(User $user, Visit $visit): bool
     {
         return true;
+    }
+
+    public function addDepartment(User $user, Visit $visit, MedicalDepartment $department): bool
+    {
+        if ($user->role !== 'department_user') {
+            return true;
+        }
+
+        return $department->id === $user->medical_department_id;
+    }
+
+    public function manageDepartmentRow(User $user, Visit $visit, VisitDepartment $visitDepartment): bool
+    {
+        if ($user->role !== 'department_user') {
+            return true;
+        }
+
+        return $visitDepartment->medical_department_id === $user->medical_department_id;
     }
 
     public function delete(User $user, Visit $visit): bool

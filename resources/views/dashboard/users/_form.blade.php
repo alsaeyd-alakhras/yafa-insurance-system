@@ -54,8 +54,31 @@
                         <select class="text-center form-select" name="role" id="role"
                             data-placeholder="اختر الدور">
                             <option value="" label="فتح القائمة">
-                            <option value="receptionist" @selected($user->role == 'receptionist')>موظف استقبال</option>
-                            <option value="admin" @selected($user->role == 'admin')>أدمن</option>
+                            <option value="receptionist" @selected(old('role', $user->role) == 'receptionist')>موظف استقبال</option>
+                            <option value="admin" @selected(old('role', $user->role) == 'admin')>أدمن</option>
+                            <option value="department_user" @selected(old('role', $user->role) == 'department_user')>مستخدم قسم طبي</option>
+                        </select>
+                    </div>
+                    <div class="mb-4 form-group col-md-4" id="department-field-wrapper" style="{{ old('role', $user->role) === 'department_user' ? '' : 'display: none;' }}">
+                        <label for="medical_department_id">القسم الطبي</label>
+                        <select class="text-center form-select" name="medical_department_id" id="medical_department_id"
+                            data-placeholder="اختر القسم الطبي">
+                            <option value="">اختر القسم الطبي</option>
+                            @php
+                                $departmentLabels = [
+                                    'clinics' => 'الكشف الطبي',
+                                    'pharmacy' => 'الصيدلية',
+                                    'laboratory' => 'المختبر',
+                                    'optics' => 'البصريات',
+                                    'dental' => 'الأسنان',
+                                    'radiology' => 'الأشعة',
+                                ];
+                            @endphp
+                            @foreach (($medicalDepartments ?? collect()) as $medicalDepartment)
+                                <option value="{{ $medicalDepartment->id }}" @selected(old('medical_department_id', $user->medical_department_id) == $medicalDepartment->id)>
+                                    {{ $departmentLabels[$medicalDepartment->name] ?? $medicalDepartment->name }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                     @endif
@@ -157,7 +180,7 @@
                     const role = $('#role').val();
                     $('input[name="abilities[]"]').prop('checked', false);
 
-                    if (role === 'receptionist') {
+                    if (role === 'receptionist' || role === 'department_user') {
                         $('input[name="abilities[]"]').each(function () {
                             if (receptionistDefaultAbilities.includes($(this).val())) {
                                 $(this).prop('checked', true);
@@ -170,7 +193,18 @@
                     syncMasterCheckboxes();
                 }
 
+                function syncDepartmentField() {
+                    const isDepartmentUser = $('#role').val() === 'department_user';
+                    $('#department-field-wrapper').toggle(isDepartmentUser);
+                    $('#medical_department_id').prop('required', isDepartmentUser);
+
+                    if (!isDepartmentUser) {
+                        $('#medical_department_id').val('');
+                    }
+                }
+
                 $('#role').on('change', function () {
+                    syncDepartmentField();
                     applyRoleDefaultAbilitiesOnCreate();
                 });
 
