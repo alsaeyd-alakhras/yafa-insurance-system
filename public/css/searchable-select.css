@@ -66,3 +66,11 @@ select.is-invalid + .select2-container--default.select2-container--open .select2
 .select2-container--default .select2-results__option--highlighted[aria-selected] {
     background-color: #696cff;
 }
+
+.radiology-exam-select-dropdown {
+    min-width: 420px;
+}
+
+.radiology-exam-select-dropdown .select2-results__option {
+    padding: 0.5rem 0.75rem;
+}

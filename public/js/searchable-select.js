@@ -73,9 +73,11 @@
 
             const $el = $(selectEl);
             const dropdownParent = wrapForDropdown($el);
+            const dropdownCssClass = selectEl.dataset.dropdownCssClass || '';
 
             $el.select2(Object.assign({}, DEFAULT_OPTIONS, {
                 dropdownParent: dropdownParent,
+                dropdownCssClass: dropdownCssClass,
             }));
         });
     };

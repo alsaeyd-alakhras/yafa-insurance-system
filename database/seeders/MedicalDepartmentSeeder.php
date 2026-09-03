@@ -47,7 +47,7 @@ class MedicalDepartmentSeeder extends Seeder
                 'name' => 'radiology',
                 'discount_percentage' => 0.00,
                 'max_discount_amount' => null,
-                'is_active' => false,
+                'is_active' => true,
             ],
         ]);
     }

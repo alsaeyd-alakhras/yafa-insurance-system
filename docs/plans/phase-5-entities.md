@@ -7,10 +7,10 @@
 ## ترتيب البناء
 
 ```
-Organization Unit → Medical Department → Clinic → Employee (+Dependent متداخل) → User → Visit
+Organization Unit → Medical Department → Clinic/Radiology Exam → Employee (+Dependent متداخل) → User → Visit
 ```
 
-**تحديث سياسة (بعد اعتماد جدول خصومات رسمي جديد، راجع `docs/reference/01-entities.md` §4/§4ب و`03-business-rules.md` §2/§3/§7):** الأقسام الطبية أصبحت خمسة (كشف طبي 100%، صيدلية 25%، مختبر 25%، بصريات 25%، أسنان 25%) بدل أربعة، بعضها له حد أقصى لمبلغ الخصم (`max_discount_amount`)، وأُضيف كيان **Clinic** جديد كلياً يُختار عند تسجيل زيارة كشف طبي.
+**تحديث سياسة (بعد اعتماد جدول خصومات رسمي جديد، راجع `docs/reference/01-entities.md` §4/§4ب/§4ج و`03-business-rules.md` §2/§3/§7):** الأقسام الطبية أصبحت ستة بعد إعادة تفعيل الأشعة. معظم الأقسام تستخدم نسبة خصم وحداً أقصى اختيارياً (`max_discount_amount`)، وأُضيف كيان **Clinic** لاختيار عيادة الكشف الطبي وكيان **RadiologyExam** لتسعير فحوصات الأشعة.
 (Survey Submission بالمرحلة 6 — سير عمل خاص يمتد بين صفحة عامة ولوحة الأدمن، مش CRUD عادي.)
 
 ## مرجع نمط DataTable الحالي
@@ -33,7 +33,7 @@ Organization Unit → Medical Department → Clinic → Employee (+Dependent م�
 
 ## 5.2 Medical Department
 
-**القرار: صفحة واحدة بجدول ثابت من 5 صفوف فعّالة (+ صف `radiology` معطّل تاريخياً غير معروض)، تعديل `discount_percentage`/`max_discount_amount`/`is_active` فقط عبر Modal — بدون إنشاء أو حذف.**
+**القرار: صفحة واحدة بجدول ثابت للأقسام الطبية، مع بقاء `radiology` مفعّلاً لكن بتسعير مختلف عبر `radiology_exams`. تعديل `discount_percentage`/`max_discount_amount`/`is_active` فقط عبر Modal — بدون إنشاء أو حذف.**
 
 **السبب:** الأقسام ثابتة حسب الجدول الرسمي المعتمد (كشف طبي/صيدلية/مختبر/بصريات/أسنان) — لا حالة استخدام لإنشاء أو حذف قسم. بناء DataTable+CRUD كامل لجدول دايماً بعدد صفوف ثابت تعقيد بدون داعٍ. **تحديث:** حقل `max_discount_amount` الجديد (nullable) يُعدَّل من نفس الـ Modal جنباً إلى جنب مع `discount_percentage` — لا قيد شرطي بينهما بالفورم (الحقل مستقل، ممكن معبّى بغض النظر عن قيمة النسبة).
 
@@ -53,6 +53,17 @@ Organization Unit → Medical Department → Clinic → Employee (+Dependent م�
 - `app/Http/Controllers/Dashboard/ClinicController.php` — `index` (DataTable أو قائمة بسيطة إن كان العدد صغيراً)، `store`/`update`/`destroy` (`destroy` عملياً تعطيل `is_active=false` وليس حذف فعلي، بما إن `visits.clinic_id` محمي بـ `restrictOnDelete` — لو فيه زيارات مرتبطة، الحذف الفعلي يفشل على مستوى DB، فمن الأفضل تعطيل مباشرة بدل محاولة حذف).
 - `resources/views/dashboard/clinics/index.blade.php` + `_modal.blade.php`.
 - `ActivityLogService::log('clinic_created'|'clinic_updated', 'Clinic', ...)`.
+
+## 5.2ج Radiology Exam (كيان أسعار الأشعة)
+
+**القرار: صفحة قائمة بسيطة + Modal للإنشاء/التعديل/التعطيل، بنفس نمط العيادات.**
+
+**السبب:** الأشعة عادت كقسم فعّال لكن لا تستخدم نسبة الخصم العامة. كل زيارة أشعة تحتاج فحصاً محدداً بسعر وخصم ثابتين، لذلك أُضيف جدول `radiology_exams` وتُنسخ قيمه إلى `visit_departments.applied_price` و`applied_discount_amount` وقت الإضافة.
+
+**الملفات:**
+- `app/Http/Controllers/Dashboard/RadiologyExamController.php` — `index` مرتب حسب `category` ثم `name`، و`store`/`update` مع تسجيل الحركة.
+- `resources/views/dashboard/radiology_exams/index.blade.php` — جدول Bootstrap عادي وModal للإنشاء/التعديل.
+- `app/Models/RadiologyExam.php` و`app/Policies/RadiologyExamPolicy.php`.
 
 ## 5.3 Employee (+ Dependent متداخل)
 

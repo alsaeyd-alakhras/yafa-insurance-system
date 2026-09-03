@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\Dependent;
 use App\Models\Employee;
 use App\Models\MedicalDepartment;
+use App\Models\RadiologyExam;
 use App\Models\User;
 use App\Models\Visit;
 use App\Models\VisitDepartment;
@@ -286,19 +287,21 @@ class VisitController extends Controller
             if (auth()->user()->role === 'department_user') {
                 $department = MedicalDepartment::findOrFail(auth()->user()->medical_department_id);
 
-                VisitDepartment::create([
-                    'visit_id' => $visit->id,
-                    'medical_department_id' => $department->id,
-                    'applied_discount_percentage' => $department->discount_percentage,
-                    'applied_max_discount_amount' => $department->max_discount_amount,
-                    'amount_before_discount' => null,
-                    'amount_after_discount' => null,
-                    'added_at' => now(),
-                    'added_by' => auth()->id(),
-                ]);
+                if ($department->name !== 'radiology') {
+                    VisitDepartment::create([
+                        'visit_id' => $visit->id,
+                        'medical_department_id' => $department->id,
+                        'applied_discount_percentage' => $department->discount_percentage,
+                        'applied_max_discount_amount' => $department->max_discount_amount,
+                        'amount_before_discount' => null,
+                        'amount_after_discount' => null,
+                        'added_at' => now(),
+                        'added_by' => auth()->id(),
+                    ]);
 
-                $visit->recalculateTotals();
-                $visit->update(['last_updated_by' => auth()->id()]);
+                    $visit->recalculateTotals();
+                    $visit->update(['last_updated_by' => auth()->id()]);
+                }
             }
 
             return $visit;
@@ -321,7 +324,7 @@ class VisitController extends Controller
     {
         $this->authorize('view', $visit);
 
-        $visit->load(['patientEmployee', 'patientDependent', 'employee', 'clinic', 'recordedBy', 'visitDepartments.medicalDepartment']);
+        $visit->load(['patientEmployee', 'patientDependent', 'employee', 'clinic', 'recordedBy', 'visitDepartments.medicalDepartment', 'visitDepartments.radiologyExam']);
 
         return response()->json([
             'id' => $visit->id,
@@ -335,6 +338,7 @@ class VisitController extends Controller
             'total_after_discount' => $visit->total_after_discount !== null ? number_format((float) $visit->total_after_discount, 2) : null,
             'departments' => $visit->visitDepartments->map(fn (VisitDepartment $vd) => [
                 'name' => self::DEPARTMENT_LABELS[$vd->medicalDepartment->name] ?? $vd->medicalDepartment->name,
+                'radiology_exam_name' => $vd->radiologyExam?->name,
                 'discount_percentage' => rtrim(rtrim(number_format($vd->applied_discount_percentage, 2), '0'), '.'),
                 'amount_before_discount' => $vd->amount_before_discount !== null ? number_format($vd->amount_before_discount, 2) : null,
                 'amount_after_discount' => $vd->amount_after_discount !== null ? number_format($vd->amount_after_discount, 2) : null,
@@ -348,7 +352,7 @@ class VisitController extends Controller
     {
         $this->authorize('update', $visit);
 
-        $visit->load(['patientEmployee', 'patientDependent', 'employee', 'clinic', 'visitDepartments.medicalDepartment']);
+        $visit->load(['patientEmployee', 'patientDependent', 'employee', 'clinic', 'visitDepartments.medicalDepartment', 'visitDepartments.radiologyExam']);
 
         $medicalDepartments = MedicalDepartment::where('is_active', true)
             ->whereNotIn('id', $visit->visitDepartments->pluck('medical_department_id'))
@@ -359,8 +363,9 @@ class VisitController extends Controller
             ->get();
 
         $clinics = Clinic::where('is_active', true)->orderBy('name')->get();
+        $radiologyExams = RadiologyExam::where('is_active', true)->orderBy('category')->orderBy('name')->get()->groupBy('category');
 
-        return view('dashboard.visits.edit', compact('visit', 'medicalDepartments', 'clinics'));
+        return view('dashboard.visits.edit', compact('visit', 'medicalDepartments', 'clinics', 'radiologyExams'));
     }
 
     public function addDepartment(Request $request, Visit $visit): JsonResponse
@@ -371,14 +376,27 @@ class VisitController extends Controller
             'medical_department_id' => 'required|exists:medical_departments,id',
             'amount_before_discount' => 'nullable|numeric|min:0',
             'clinic_id' => 'nullable|exists:clinics,id',
+            'radiology_exam_id' => 'nullable|exists:radiology_exams,id',
         ]);
 
         $department = MedicalDepartment::findOrFail($validated['medical_department_id']);
         $this->authorize('addDepartment', [$visit, $department]);
 
-        $request->validate($department->name === 'clinics'
-            ? ['clinic_id' => 'required|exists:clinics,id']
-            : ['clinic_id' => 'prohibited']);
+        $request->validate(match ($department->name) {
+            'clinics' => [
+                'clinic_id' => 'required|exists:clinics,id',
+                'radiology_exam_id' => 'prohibited',
+            ],
+            'radiology' => [
+                'clinic_id' => 'prohibited',
+                'amount_before_discount' => 'prohibited',
+                'radiology_exam_id' => 'required|exists:radiology_exams,id',
+            ],
+            default => [
+                'clinic_id' => 'prohibited',
+                'radiology_exam_id' => 'prohibited',
+            ],
+        });
 
         if ($visit->visitDepartments()->where('medical_department_id', $department->id)->exists()) {
             return response()->json(['message' => 'هذا القسم مُضاف مسبقاً لهذه الزيارة.'], 422);
@@ -401,13 +419,20 @@ class VisitController extends Controller
             }
         }
 
-        $visitDepartment = DB::transaction(function () use ($department, $validated, $visit) {
+        $radiologyExam = $department->name === 'radiology'
+            ? RadiologyExam::findOrFail($validated['radiology_exam_id'])
+            : null;
+
+        $visitDepartment = DB::transaction(function () use ($department, $radiologyExam, $validated, $visit) {
             $visitDepartment = VisitDepartment::create([
                 'visit_id' => $visit->id,
                 'medical_department_id' => $department->id,
+                'radiology_exam_id' => $radiologyExam?->id,
+                'applied_price' => $radiologyExam?->price,
+                'applied_discount_amount' => $radiologyExam?->discount_amount,
                 'applied_discount_percentage' => $department->discount_percentage,
                 'applied_max_discount_amount' => $department->max_discount_amount,
-                'amount_before_discount' => $validated['amount_before_discount'] ?? null,
+                'amount_before_discount' => $radiologyExam?->price ?? $validated['amount_before_discount'] ?? null,
                 'amount_after_discount' => null,
                 'added_at' => now(),
                 'added_by' => auth()->id(),
@@ -443,6 +468,12 @@ class VisitController extends Controller
         $this->authorize('update', $visit);
         abort_unless($visitDepartment->visit_id === $visit->id, 404);
         $this->authorize('manageDepartmentRow', [$visit, $visitDepartment]);
+
+        if ($visitDepartment->radiology_exam_id !== null) {
+            return response()->json([
+                'message' => 'لا يمكن تعديل مبلغ فحص الأشعة يدوياً — احذف السطر وأضف الفحص من جديد لو احتجت تغييره.',
+            ], 422);
+        }
 
         $validated = $request->validate([
             'amount_before_discount' => 'nullable|numeric|min:0',
@@ -538,7 +569,7 @@ class VisitController extends Controller
 
     private function visitPayload(Visit $visit, string $message): array
     {
-        $visit->refresh()->load(['clinic', 'visitDepartments.medicalDepartment']);
+        $visit->refresh()->load(['clinic', 'visitDepartments.medicalDepartment', 'visitDepartments.radiologyExam']);
 
         return [
             'message' => $message,
@@ -552,6 +583,8 @@ class VisitController extends Controller
             'departments' => $visit->visitDepartments->map(fn (VisitDepartment $visitDepartment) => [
                 'id' => $visitDepartment->id,
                 'name' => $visitDepartment->medicalDepartment->name,
+                'radiology_exam_name' => $visitDepartment->radiologyExam?->name,
+                'applied_discount_amount' => $visitDepartment->applied_discount_amount,
                 'applied_discount_percentage' => $visitDepartment->applied_discount_percentage,
                 'amount_before_discount' => $visitDepartment->amount_before_discount,
                 'amount_after_discount' => $visitDepartment->amount_after_discount,

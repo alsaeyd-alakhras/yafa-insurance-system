@@ -13,16 +13,17 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(MedicalDepartmentSeeder::class);
+        $this->call(RadiologyExamSeeder::class);
         $this->call(OrganizationUnitSeeder::class);
 
         User::create([
             'name' => 'Alsaeyd J Alakhras',
             'email' => 'alsaeydjalkhras@gmail.com',
-            'password'  => '20051118Jamal',
-            'username'  => 'saeyd_jamal',
-            'last_activity'  => now(),
-            'avatar'  => null,
-            'super_admin'  => 1,
+            'password' => '20051118Jamal',
+            'username' => 'saeyd_jamal',
+            'last_activity' => now(),
+            'avatar' => null,
+            'super_admin' => 1,
         ]);
     }
 }

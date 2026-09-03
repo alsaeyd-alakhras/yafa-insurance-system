@@ -41,8 +41,9 @@
                 auth()->user()?->can('view', 'App\Models\OrganizationUnit')
                 || auth()->user()?->can('view', 'App\Models\MedicalDepartment')
                 || auth()->user()?->can('view', 'App\Models\Clinic')
+                || auth()->user()?->can('view', 'App\Models\RadiologyExam')
             )
-            <li class="menu-item {{ request()->is('organization-units*') || request()->is('medical-departments*') || request()->is('clinics*') ? 'active open' : '' }}">
+            <li class="menu-item {{ request()->is('organization-units*') || request()->is('medical-departments*') || request()->is('clinics*') || request()->is('radiology-exams*') ? 'active open' : '' }}">
                 <a href="javascript:void(0)" class="menu-link menu-toggle">
                     <i class="fa-solid fa-database me-2"></i>
                     <div data-i18n="foundation">البيانات الأساسية</div>
@@ -69,6 +70,14 @@
                         <a href="{{ route('dashboard.clinics.index') }}" class="menu-link">
                             <i class="fa-solid fa-stethoscope me-2"></i>
                             <div data-i18n="clinics">العيادات</div>
+                        </a>
+                    </li>
+                    @endcan
+                    @can('view', 'App\Models\RadiologyExam')
+                    <li class="menu-item {{ request()->is('radiology-exams*') ? 'active' : '' }}">
+                        <a href="{{ route('dashboard.radiology-exams.index') }}" class="menu-link">
+                            <i class="fa-solid fa-x-ray me-2"></i>
+                            <div data-i18n="radiology_exams">أسعار فحوصات الأشعة</div>
                         </a>
                     </li>
                     @endcan

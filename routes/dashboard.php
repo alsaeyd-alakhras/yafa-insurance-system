@@ -1,6 +1,5 @@
 <?php
 
-
 // dashboard routes
 
 use App\Http\Controllers\Dashboard\ActivityLogController;
@@ -10,6 +9,7 @@ use App\Http\Controllers\Dashboard\EmployeeController;
 use App\Http\Controllers\Dashboard\HomeController;
 use App\Http\Controllers\Dashboard\MedicalDepartmentController;
 use App\Http\Controllers\Dashboard\OrganizationUnitController;
+use App\Http\Controllers\Dashboard\RadiologyExamController;
 use App\Http\Controllers\Dashboard\ReportController;
 use App\Http\Controllers\Dashboard\SurveySubmissionController;
 use App\Http\Controllers\Dashboard\UserController;
@@ -19,17 +19,17 @@ use Illuminate\Support\Facades\Route;
 Route::group([
     'prefix' => '',
     'middleware' => ['auth'],
-    'as' => 'dashboard.'
+    'as' => 'dashboard.',
 ], function () {
     /* ********************************************************** */
 
     // Dashboard ************************
-    Route::get('/', [HomeController::class,'index'])->name('home');
+    Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::post('dashboard/refresh-cache', [HomeController::class, 'refreshDashboardCache'])->name('home.refresh-cache');
 
     // Logs ************************
-    Route::get('logs',[ActivityLogController::class,'index'])->name('logs.index');
-    Route::get('getLogs',[ActivityLogController::class,'getLogs'])->name('logs.getLogs');
+    Route::get('logs', [ActivityLogController::class, 'index'])->name('logs.index');
+    Route::get('getLogs', [ActivityLogController::class, 'getLogs'])->name('logs.getLogs');
 
     // users ************************
     Route::get('profile/settings', [UserController::class, 'settings'])->name('profile.settings');
@@ -46,6 +46,8 @@ Route::group([
     Route::resource('organization-units', OrganizationUnitController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('medical-departments', MedicalDepartmentController::class)->only(['index', 'store', 'update']);
     Route::resource('clinics', ClinicController::class)->only(['index', 'store', 'update']);
+    Route::resource('radiology-exams', RadiologyExamController::class)->only(['index', 'store', 'update']);
+    Route::get('radiology-exams-filters/{column}', [RadiologyExamController::class, 'getFilterOptions'])->name('radiology-exams.filters');
 
     Route::get('employees/check-national-id/{nationalId}', [EmployeeController::class, 'checkNationalId'])->name('employees.check-national-id');
     Route::get('employees/export', [EmployeeController::class, 'export'])->name('employees.export');

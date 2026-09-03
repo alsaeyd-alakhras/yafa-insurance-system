@@ -69,26 +69,37 @@
                                     @foreach ($visit->visitDepartments as $vd)
                                         <tr>
                                             <td>{{ $departmentLabels[$vd->medicalDepartment->name] ?? $vd->medicalDepartment->name }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($vd->applied_discount_percentage, 2), '0'), '.') }}%</td>
                                             <td>
-                                                <form
-                                                    action="{{ route('dashboard.visits.departments.update-amount', [$visit, $vd]) }}"
-                                                    method="post"
-                                                    class="department-amount-form d-flex gap-2"
-                                                >
-                                                    @csrf
-                                                    @method('put')
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        name="amount_before_discount"
-                                                        class="form-control form-control-sm"
-                                                        value="{{ $vd->amount_before_discount }}"
-                                                        style="max-width: 120px;"
+                                                @if ($vd->radiology_exam_id !== null)
+                                                    خصم ثابت: {{ number_format((float) ($vd->applied_discount_amount ?? 0), 2) }} ₪
+                                                @else
+                                                    {{ rtrim(rtrim(number_format($vd->applied_discount_percentage, 2), '0'), '.') }}%
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if ($vd->radiology_exam_id !== null)
+                                                    <div>{{ $vd->radiologyExam?->name ?? '-' }}</div>
+                                                    <small class="text-muted">السعر: {{ $vd->amount_before_discount !== null ? number_format((float) $vd->amount_before_discount, 2) . ' ₪' : '-' }}</small>
+                                                @else
+                                                    <form
+                                                        action="{{ route('dashboard.visits.departments.update-amount', [$visit, $vd]) }}"
+                                                        method="post"
+                                                        class="department-amount-form d-flex gap-2"
                                                     >
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary">حفظ</button>
-                                                </form>
+                                                        @csrf
+                                                        @method('put')
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            name="amount_before_discount"
+                                                            class="form-control form-control-sm"
+                                                            value="{{ $vd->amount_before_discount }}"
+                                                            style="max-width: 120px;"
+                                                        >
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary">حفظ</button>
+                                                    </form>
+                                                @endif
                                             </td>
                                             <td>{{ $vd->amount_after_discount !== null ? number_format($vd->amount_after_discount, 2) . ' ₪' : '-' }}</td>
                                             <td>
@@ -130,7 +141,26 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="col-lg-6 col-md-12 mb-3 d-none" id="radiology-exam-field-wrapper">
+                                <label class="form-label" for="radiology_exam_id">فحص الأشعة</label>
+                                <select class="form-select select2-searchable" name="radiology_exam_id" id="radiology_exam_id" data-dropdown-css-class="radiology-exam-select-dropdown" disabled>
+                                    <option value="">اختر فحص الأشعة</option>
+                                    @foreach ($radiologyExams as $category => $exams)
+                                        @if ($category)
+                                            <optgroup label="{{ $category }}">
+                                                @foreach ($exams as $exam)
+                                                    <option value="{{ $exam->id }}">{{ $exam->name }} - {{ number_format((float) $exam->price, 2) }} ₪</option>
+                                                @endforeach
+                                            </optgroup>
+                                        @else
+                                            @foreach ($exams as $exam)
+                                                <option value="{{ $exam->id }}">{{ $exam->name }} - {{ number_format((float) $exam->price, 2) }} ₪</option>
+                                            @endforeach
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-lg-3 col-md-6 mb-3" id="amount-field-wrapper">
                                 <x-form.input name="amount_before_discount" type="number" step="0.01" min="0" label="المبلغ الأساسي (اختياري)" />
                             </div>
                             <div class="col-lg-3 col-md-6 mb-3">
@@ -144,6 +174,16 @@
     </div>
 
     <x-confirm-modal />
+
+    @push('styles')
+        <link rel="stylesheet" href="{{ asset('assets/vendor/libs/select2/select2.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/searchable-select.css') }}">
+    @endpush
+
+    @push('scripts')
+        <script src="{{ asset('assets/vendor/libs/select2/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/searchable-select.js') }}"></script>
+    @endpush
 
     @push('scripts')
         <script>
@@ -163,11 +203,22 @@
                 return xhr.responseJSON?.message || 'حدث خطأ أثناء تنفيذ العملية.';
             }
 
-            function toggleClinicField() {
-                const isClinicDepartment = $('#medical_department_id option:selected').data('name') === 'clinics';
+            function toggleDepartmentFields() {
+                const selectedDepartment = $('#medical_department_id option:selected').data('name');
+                const isClinicDepartment = selectedDepartment === 'clinics';
+                const isRadiologyDepartment = selectedDepartment === 'radiology';
+
                 $('#clinic-field-wrapper').toggleClass('d-none', !isClinicDepartment);
                 $('#clinic_id').prop('disabled', !isClinicDepartment).prop('required', isClinicDepartment);
                 if (!isClinicDepartment) $('#clinic_id').val('');
+
+                $('#radiology-exam-field-wrapper').toggleClass('d-none', !isRadiologyDepartment);
+                $('#radiology_exam_id').prop('disabled', !isRadiologyDepartment).prop('required', isRadiologyDepartment);
+                if (!isRadiologyDepartment) $('#radiology_exam_id').val('').trigger('change');
+
+                $('#amount-field-wrapper').toggleClass('d-none', isRadiologyDepartment);
+                $('#amount_before_discount').prop('disabled', isRadiologyDepartment);
+                if (isRadiologyDepartment) $('#amount_before_discount').val('');
             }
 
             function renderVisitState(payload) {
@@ -189,7 +240,15 @@
                 payload.departments.forEach(function (department) {
                     const $row = $('<tr></tr>');
                     $row.append($('<td></td>').text(departmentLabels[department.name] || department.name));
-                    $row.append($('<td></td>').text(`${Number(department.applied_discount_percentage).toFixed(2).replace(/\.00$/, '')}%`));
+                    if (department.radiology_exam_name) {
+                        $row.append($('<td></td>').text(`خصم ثابت: ${formatMoney(department.applied_discount_amount ?? 0)}`));
+
+                        const $examCell = $('<td></td>')
+                            .append($('<div></div>').text(department.radiology_exam_name))
+                            .append($('<small class="text-muted"></small>').text(`السعر: ${formatMoney(department.amount_before_discount)}`));
+                        $row.append($examCell);
+                    } else {
+                        $row.append($('<td></td>').text(`${Number(department.applied_discount_percentage).toFixed(2).replace(/\.00$/, '')}%`));
 
                     const $form = $('<form class="department-amount-form d-flex gap-2" method="post"></form>')
                         .attr('action', department.update_url)
@@ -199,6 +258,7 @@
                             .val(department.amount_before_discount ?? ''))
                         .append('<button type="submit" class="btn btn-sm btn-outline-primary">حفظ</button>');
                     $row.append($('<td></td>').append($form));
+                    }
                     $row.append($('<td></td>').text(formatMoney(department.amount_after_discount)));
 
                     const $deleteButton = $('<button type="button" class="btn btn-sm btn-outline-danger btn-delete-department" title="حذف القسم"><i class="fa-solid fa-trash"></i></button>')
@@ -218,7 +278,7 @@
                     );
                 });
                 $('#add-department-section').toggleClass('d-none', !payload.available_departments.length);
-                toggleClinicField();
+                toggleDepartmentFields();
             }
 
             function submitDepartmentForm($form) {
@@ -245,7 +305,7 @@
                 });
             }
 
-            $(document).on('change', '#medical_department_id', toggleClinicField);
+            $(document).on('change', '#medical_department_id', toggleDepartmentFields);
 
             $(document).on('submit', '#add-department-form, .department-amount-form', function (event) {
                 event.preventDefault();

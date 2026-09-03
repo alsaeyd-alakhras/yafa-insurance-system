@@ -38,6 +38,12 @@ return [
         'create' => 'اضافة',
         'update' => 'تعديل',
     ],
+    'radiology_exams' => [
+        'name' => 'أسعار فحوصات الأشعة',
+        'view' => 'عرض',
+        'create' => 'اضافة',
+        'update' => 'تعديل',
+    ],
     'employees' => [
         'name' => 'الموظفون',
         'view' => 'عرض',

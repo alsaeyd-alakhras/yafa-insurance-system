@@ -87,14 +87,14 @@
 | البصريات (optics) — **قسم جديد** | 25% | لا يوجد (على كافة خدمات ومنتجات البصريات) |
 | الأسنان (dental) — **قسم جديد** | 25% | لا يوجد (على الخدمات العلاجية فقط) |
 
-**قسم "الأشعة" (radiology) الأصلي غير مذكور بالجدول الجديد** — تقرر تعطيله (`is_active = false`) بدل حذفه، حفاظاً على أي بيانات/زيارات سابقة مرتبطة به دون التأثير على الفريدية التاريخية. لا يظهر كخيار عند تسجيل زيارة جديدة طالما `is_active = false`.
+**قسم "الأشعة" (radiology)** أُعيد تفعيله مع آلية تسعير مختلفة: لا يستخدم نسبة الخصم العامة، بل يختار الاستقبال فحصاً محدداً من `radiology_exams` ويتم نسخ السعر وقيمة الخصم الثابتة لحظة الإضافة.
 
 **الجدول:** `medical_departments`
 
 | الحقل | النوع | الوصف |
 |---|---|---|
 | id | bigint, PK | معرّف تلقائي |
-| name | enum/string('clinics','laboratory','pharmacy','optics','dental','radiology') | اسم القسم — `radiology` باقٍ بالبيانات لأسباب تاريخية فقط، `is_active=false` |
+| name | enum/string('clinics','laboratory','pharmacy','optics','dental','radiology') | اسم القسم — `radiology` مفعّل لكنه يستخدم تسعير فحوصات الأشعة بدل نسبة الخصم العامة |
 | discount_percentage | decimal(5,2) | نسبة الخصم الحالية (0 إلى 100). 100 = مجاني بالكامل |
 | max_discount_amount | decimal(10,2), nullable | **حقل جديد.** الحد الأقصى لمبلغ الخصم بالشيكل لهذا القسم. لو معبّى، أي خصم محسوب على زيارة يُقارن به ويُؤخذ الأقل (`MIN(amount_before_discount × discount_percentage / 100, max_discount_amount)`). لو null، لا حد أقصى. الحقل مستقل عن قيمة النسبة — ليس مشروطاً بأن تكون النسبة ≥ 25% أو أي عتبة أخرى. |
 | is_active | boolean, default true | هل القسم مفعّل حالياً (لا يظهر للاستقبال إن كان false) |
@@ -118,6 +118,24 @@
 | created_at / updated_at | timestamp | — |
 
 قائمة مفتوحة تُدار من الإدارة (إنشاء/تعديل/تعطيل)، على عكس `medical_departments` ذات الصفوف الثابتة.
+
+---
+
+## 4ج. Radiology Exam — فحص الأشعة
+
+كيان مستقل يمثل قائمة أسعار فحوصات الأشعة. يختاره الاستقبال عند إضافة قسم `radiology` للزيارة، وتُنسخ قيم السعر والخصم الثابت إلى `visit_departments` حتى لا تتأثر الزيارات القديمة بتعديل الأسعار لاحقاً.
+
+**الجدول:** `radiology_exams`
+
+| الحقل | النوع | الوصف |
+|---|---|---|
+| id | bigint, PK | معرّف تلقائي |
+| category | string, nullable | تصنيف الفحص (مثلاً CT أو ألتراساوند) |
+| name | string | اسم الفحص |
+| price | decimal(10,2) | السعر الأساسي للفحص |
+| discount_amount | decimal(10,2), default 0 | قيمة الخصم الثابتة على هذا الفحص |
+| is_active | boolean, default true | هل الفحص يظهر في قائمة الاختيار للزيارات الجديدة |
+| created_at / updated_at | timestamp | — |
 
 ---
 
@@ -162,6 +180,9 @@
 | id | bigint, PK | معرّف تلقائي |
 | visit_id | bigint, FK → visits.id | الزيارة المرتبطة |
 | medical_department_id | bigint, FK → medical_departments.id | القسم الطبي |
+| radiology_exam_id | bigint, FK → radiology_exams.id, nullable | فحص الأشعة المختار إن كان القسم `radiology` |
+| applied_price | decimal(10,2), nullable | سعر فحص الأشعة كما كان لحظة إضافته للزيارة |
+| applied_discount_amount | decimal(10,2), nullable | قيمة خصم فحص الأشعة كما كانت لحظة الإضافة |
 | applied_discount_percentage | decimal(5,2) | نسبة الخصم كما كانت لحظة إضافة هذا القسم للزيارة (snapshot من medical_departments.discount_percentage) |
 | applied_max_discount_amount | decimal(10,2), nullable | **حقل جديد.** الحد الأقصى لمبلغ الخصم كما كان لحظة الإضافة (snapshot من medical_departments.max_discount_amount) — null إن لم يكن للقسم حد أقصى |
 | amount_before_discount | decimal(10,2), nullable | المبلغ الأساسي الذي يُدخله الاستقبال لهذا القسم — حقل اختياري |

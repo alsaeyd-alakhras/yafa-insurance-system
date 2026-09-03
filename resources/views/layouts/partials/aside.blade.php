@@ -75,6 +75,14 @@
             </a>
         </li>
         @endcan
+        @can('view', 'App\Models\RadiologyExam')
+        <li class="menu-item {{ request()->is('radiology-exams*') ? 'active' : '' }}">
+            <a href="{{ route('dashboard.radiology-exams.index') }}" class="menu-link">
+                <i class="fa-solid fa-x-ray me-2"></i>
+                <div data-i18n="radiology_exams">أسعار فحوصات الأشعة</div>
+            </a>
+        </li>
+        @endcan
         @can('view', 'App\Models\SurveySubmission')
         <li class="menu-item {{ request()->is('survey-submissions*') ? 'active' : '' }}">
             <a href="{{ route('dashboard.survey-submissions.index') }}" class="menu-link">

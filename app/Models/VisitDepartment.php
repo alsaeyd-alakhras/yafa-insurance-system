@@ -15,6 +15,9 @@ class VisitDepartment extends Model
     protected $fillable = [
         'visit_id',
         'medical_department_id',
+        'radiology_exam_id',
+        'applied_price',
+        'applied_discount_amount',
         'applied_discount_percentage',
         'applied_max_discount_amount',
         'amount_before_discount',
@@ -40,6 +43,11 @@ class VisitDepartment extends Model
         return $this->belongsTo(MedicalDepartment::class);
     }
 
+    public function radiologyExam(): BelongsTo
+    {
+        return $this->belongsTo(RadiologyExam::class);
+    }
+
     public function addedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'added_by');
@@ -47,6 +55,14 @@ class VisitDepartment extends Model
 
     public function calculateAmountAfterDiscount(): ?float
     {
+        if ($this->radiology_exam_id !== null) {
+            if ($this->applied_price === null) {
+                return null;
+            }
+
+            return round((float) $this->applied_price - (float) ($this->applied_discount_amount ?? 0), 2);
+        }
+
         if ($this->amount_before_discount === null) {
             return null;
         }
