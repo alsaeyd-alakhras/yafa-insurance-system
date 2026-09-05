@@ -2,6 +2,6 @@
     <form action="{{route('dashboard.users.update',$user->id)}}" method="post" class="col-12" enctype="multipart/form-data">
         @csrf
         @method('put')
-        @include("dashboard.users._form")
+        @include("dashboard.users._form", ['btn_label' => 'حفظ'])
     </form>
 </x-front-layout>

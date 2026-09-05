@@ -124,7 +124,7 @@ class UserController extends Controller
         if (Auth::user()->id != $user->id && ! Auth::user()->can('view', User::class)) {
             abort(403);
         }
-        $profile = Auth::user()->id == $user->id && ! Auth::user()->can('view', User::class) ? true : false;
+        $profile = Auth::user()->id == $user->id;
         $logs = ActivityLog::where('user_id', $user->id)->orderBy('created_at', 'DESC')->paginate(20);
 
         return view('dashboard.users.show', compact('user', 'logs', 'profile'));
@@ -216,12 +216,22 @@ class UserController extends Controller
     {
         $this->authorize('update', User::class);
 
-        $validated = $request->validate([
+        $rules = [
             'name' => 'required',
             'username' => 'required|string|unique:users,username,'.$user->id,
             'email' => 'nullable|email',
             'role' => 'required|in:admin,receptionist,department_user',
             'medical_department_id' => 'required_if:role,department_user|nullable|exists:medical_departments,id',
+        ];
+
+        if ($request->filled('password')) {
+            $rules['password'] = 'required|same:confirm_password';
+            $rules['confirm_password'] = 'required|same:password';
+        }
+
+        $validated = $request->validate($rules, [
+            'password.same' => 'كلمة المرور غير متطابقة',
+            'confirm_password.same' => 'كلمة المرور غير متطابقة',
         ]);
 
         DB::beginTransaction();

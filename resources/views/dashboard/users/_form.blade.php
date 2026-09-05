@@ -43,10 +43,8 @@
                         @endif
                     </div>
                     <div class="mb-4 col-md-4">
-                        @if (!isset($btn_label) || isset($settings_profile))
-                            <x-form.input type="password" label="تأكيد كلمة المرور" name="confirm_password"
-                                placeholder="****" :required="!isset($btn_label)" />
-                        @endif
+                        <x-form.input type="password" label="تأكيد كلمة المرور" name="confirm_password"
+                            placeholder="****" :required="!isset($btn_label)" />
                     </div>
                     @if(!isset($settings_profile))
                     <div class="mb-4 form-group col-md-4">
