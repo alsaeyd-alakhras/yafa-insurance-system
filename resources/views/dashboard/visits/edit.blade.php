@@ -113,6 +113,14 @@
                                         </tr>
                                     @endforeach
                                 </tbody>
+                                <tfoot id="visit-departments-foot" class="{{ $visit->visitDepartments->isEmpty() ? 'd-none' : '' }}">
+                                    <tr class="table-light fw-bold">
+                                        <td colspan="2" class="text-start">الإجمالي</td>
+                                        <td>{{ number_format((float) $visit->visitDepartments->sum('amount_before_discount'), 2) }} ₪</td>
+                                        <td>{{ number_format((float) $visit->visitDepartments->sum('amount_after_discount'), 2) }} ₪</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
 
@@ -237,6 +245,9 @@
                     $body.html('<tr class="empty-departments-row"><td colspan="5" class="text-center text-muted py-4">لا توجد أقسام مضافة بعد.</td></tr>');
                 }
 
+                let totalBefore = 0;
+                let totalAfter = 0;
+
                 payload.departments.forEach(function (department) {
                     const $row = $('<tr></tr>');
                     $row.append($('<td></td>').text(departmentLabels[department.name] || department.name));
@@ -261,12 +272,19 @@
                     }
                     $row.append($('<td></td>').text(formatMoney(department.amount_after_discount)));
 
+                    totalBefore += Number(department.amount_before_discount) || 0;
+                    totalAfter += Number(department.amount_after_discount) || 0;
+
                     const $deleteButton = $('<button type="button" class="btn btn-sm btn-outline-danger btn-delete-department" title="حذف القسم"><i class="fa-solid fa-trash"></i></button>')
                         .attr('data-url', department.delete_url)
                         .attr('data-name', departmentLabels[department.name] || department.name);
                     $row.append($('<td></td>').append($deleteButton));
                     $body.append($row);
                 });
+
+                const $footCells = $('#visit-departments-foot').toggleClass('d-none', !payload.departments.length).find('td');
+                $footCells.eq(1).text(formatMoney(totalBefore));
+                $footCells.eq(2).text(formatMoney(totalAfter));
 
                 const $departmentSelect = $('#medical_department_id').empty().append('<option value="">اختر القسم</option>');
                 payload.available_departments.forEach(function (department) {

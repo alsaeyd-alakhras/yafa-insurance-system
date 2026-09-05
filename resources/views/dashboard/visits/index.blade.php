@@ -371,9 +371,13 @@
                     data: { national_id: patient.national_id },
                     success: function (response) {
                         if (response.redirect) {
+                            const existingVisitMessage = response.existing_visit_has_clinic
+                                ? 'هذا المريض عنده زيارة مسجّلة اليوم بعيادة محددة.'
+                                : 'هذا المريض عنده زيارة مسجّلة اليوم بدون عيادة محددة.';
+
                             $result.html(`
                                 <div class="alert alert-info mb-2">
-                                    هذا المريض عنده زيارة مسجّلة اليوم بدون عيادة محددة.
+                                    ${existingVisitMessage}
                                     <a class="btn btn-sm btn-primary ms-3" href="${response.redirect}">فتح الزيارة الموجودة</a>
                                 </div>
                                 <div class="alert alert-secondary mb-0">

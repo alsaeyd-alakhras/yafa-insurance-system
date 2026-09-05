@@ -232,6 +232,7 @@ class VisitController extends Controller
         if ($resolution['existing_visit']) {
             return response()->json([
                 'existing_visit_id' => $resolution['existing_visit']->id,
+                'existing_visit_has_clinic' => $resolution['existing_visit']->clinic_id !== null,
                 'redirect' => route('dashboard.visits.edit', $resolution['existing_visit']),
             ]);
         }
@@ -407,9 +408,10 @@ class VisitController extends Controller
             $patientNationalId = $visit->patientEmployee?->national_id ?? $visit->patientDependent?->national_id;
             $resolution = $this->resolvePatientVisit(
                 $patientNationalId,
-                (int) $validated['clinic_id'],
-                $visit->visit_date,
-                $visit->id
+                matchClinicId: true,
+                clinicId: (int) $validated['clinic_id'],
+                visitDate: $visit->visit_date,
+                excludeVisitId: $visit->id
             );
 
             if ($resolution && $resolution['existing_visit']) {
@@ -534,6 +536,7 @@ class VisitController extends Controller
 
     private function resolvePatientVisit(
         string $nationalId,
+        bool $matchClinicId = false,
         ?int $clinicId = null,
         mixed $visitDate = null,
         ?int $excludeVisitId = null
@@ -551,8 +554,7 @@ class VisitController extends Controller
             ->when($dependent, fn ($query) => $query->where('patient_dependent_id', $dependent->id))
             ->whereDate('visit_date', $visitDate ?? now()->toDateString())
             ->when(
-                $clinicId === null,
-                fn ($query) => $query->whereNull('clinic_id'),
+                $matchClinicId,
                 fn ($query) => $query->where('clinic_id', $clinicId)
             )
             ->when($excludeVisitId, fn ($query) => $query->whereKeyNot($excludeVisitId))
